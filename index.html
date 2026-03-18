@@ -1,0 +1,47 @@
+let hook = {
+  active: false,
+  x: 0,
+  y: 0
+};
+
+canvas.addEventListener("click", (e) => {
+  hook.x = e.clientX;
+  hook.y = e.clientY;
+  hook.active = true;
+});
+
+function update() {
+  if (keys["w"]) player.y -= player.speed;
+  if (keys["s"]) player.y += player.speed;
+  if (keys["a"]) player.x -= player.speed;
+  if (keys["d"]) player.x += player.speed;
+
+  // Grapple movement
+  if (hook.active) {
+    let dx = hook.x - player.x;
+    let dy = hook.y - player.y;
+
+    player.x += dx * 0.05;
+    player.y += dy * 0.05;
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw hook line
+  if (hook.active) {
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y);
+    ctx.lineTo(hook.x, hook.y);
+    ctx.stroke();
+  }
+
+  // Player
+  ctx.fillStyle = "black";
+  ctx.fillRect(player.x, player.y, 20, 20);
+
+  // Titan
+  ctx.fillStyle = "red";
+  ctx.fillRect(500, 200, 80, 120);
+}
