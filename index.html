@@ -17,269 +17,63 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// ---------- SPRITE LOADING ----------
-let spriteSheet = new Image();
-let spriteLoaded = false;
+// ---------- IMAGE ----------
+let sprite = new Image();
+let loaded = false;
 
-spriteSheet.onload = () => {
-  console.log("SPRITE LOADED");
-  spriteLoaded = true;
+sprite.onload = () => {
+  console.log("IMAGE LOADED");
+  loaded = true;
 };
 
-spriteSheet.onerror = () => {
-  console.log("SPRITE FAILED TO LOAD");
+sprite.onerror = () => {
+  console.log("FAILED TO LOAD IMAGE");
 };
 
-spriteSheet.src = "./sprites.png"; // MAKE SURE FILE IS IN SAME FOLDER
-
-const SPRITE_SIZE = 64;
-
-// ---------- SPRITE MAP ----------
-let spriteMap = {
-  "Eren": {row:0},
-  "Mikasa": {row:1},
-  "Armin": {row:2},
-  "Levi": {row:3},
-  "Reiner": {row:4},
-  "Annie": {row:5}
-};
+// 🔴 CHANGE NAME IF NEEDED
+sprite.src = "./sprites.png";
 
 // ---------- STATE ----------
 let gameState = "loading";
 
 // ---------- LOADING ----------
 function drawLoading(){
-  ctx.fillStyle="#1e1e2f";
+  ctx.fillStyle="black";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
   ctx.fillStyle="white";
   ctx.font="30px Arial";
   ctx.textAlign="center";
-  ctx.fillText("LOADING SPRITES...", canvas.width/2, canvas.height/2);
+  ctx.fillText("LOADING...", canvas.width/2, canvas.height/2);
 
-  if(spriteLoaded){
+  if(loaded){
     gameState = "menu";
   }
 }
 
-// ---------- CHARACTERS ----------
-let characters = [
- {name:"Eren",speed:5,health:3,range:40},
- {name:"Mikasa",speed:8,health:2,range:30},
- {name:"Armin",speed:4,health:3,range:50},
- {name:"Levi",speed:7,health:2,range:70},
- {name:"Reiner",speed:3,health:5,range:50},
- {name:"Annie",speed:5,health:3,range:45}
-];
-
 // ---------- MENU ----------
-let selectedCharacter = 0;
-
 function drawMenu(){
-  ctx.fillStyle="#1e1e2f";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  ctx.fillStyle="white";
-  ctx.font="25px Arial";
-  ctx.textAlign="center";
-  ctx.fillText("SELECT CHARACTER", canvas.width/2, 80);
-
-  let startX = canvas.width/2 - (characters.length * 100)/2;
-
-  characters.forEach((c,i)=>{
-    let x = startX + i*100;
-    let y = canvas.height/2;
-
-    let sprite = spriteMap[c.name];
-
-    // DRAW SPRITE
-    if(spriteLoaded){
-      ctx.drawImage(
-        spriteSheet,
-        0, sprite.row * SPRITE_SIZE,
-        SPRITE_SIZE, SPRITE_SIZE,
-        x-32, y-32,
-        64, 64
-      );
-    } else {
-      ctx.fillStyle="gray";
-      ctx.fillRect(x-40,y-40,80,80);
-    }
-
-    // HIGHLIGHT
-    if(i === selectedCharacter){
-      ctx.strokeStyle="yellow";
-      ctx.lineWidth=3;
-      ctx.strokeRect(x-40,y-40,80,80);
-    }
-
-    ctx.fillStyle="white";
-    ctx.fillText(c.name,x,y+60);
-  });
-}
-
-// ---------- PLAYER ----------
-let player;
-
-function createPlayer(c){
-  return {
-    name:c.name,
-    x:canvas.width/2,
-    y:canvas.height/2,
-    speed:c.speed,
-    health:c.health,
-    maxHealth:c.health,
-    range:c.range,
-    frame:0,
-    frameTimer:0,
-    facing:1
-  };
-}
-
-// ---------- CONTROLS ----------
-let keys={};
-
-document.addEventListener("keydown",e=>{
-  keys[e.key]=true;
-
-  if(gameState==="menu"){
-    if(e.key==="ArrowLeft") selectedCharacter--;
-    if(e.key==="ArrowRight") selectedCharacter++;
-
-    if(e.key==="Enter") startGame();
-
-    if(selectedCharacter<0) selectedCharacter=characters.length-1;
-    if(selectedCharacter>=characters.length) selectedCharacter=0;
-  }
-
-  if(gameState==="gameover" && e.key==="Enter"){
-    gameState="menu";
-  }
-});
-
-document.addEventListener("keyup",e=>keys[e.key]=false);
-
-// ---------- TITANS ----------
-let titans=[];
-let wave=1;
-
-function spawnWave(){
-  for(let i=0;i<wave+3;i++){
-    titans.push({
-      x:Math.random()*canvas.width,
-      y:Math.random()*canvas.height,
-      speed:1+Math.random()
-    });
-  }
-}
-
-// ---------- UPDATE ----------
-function update(){
-  if(keys["w"]) player.y-=player.speed;
-  if(keys["s"]) player.y+=player.speed;
-  if(keys["a"]){ player.x-=player.speed; player.facing=-1; }
-  if(keys["d"]){ player.x+=player.speed; player.facing=1; }
-
-  // animation
-  player.frameTimer++;
-  if(player.frameTimer > 8){
-    player.frame++;
-    player.frameTimer = 0;
-  }
-  if(player.frame > 3) player.frame = 0;
-
-  titans.forEach((t,i)=>{
-    let dx=player.x-t.x;
-    let dy=player.y-t.y;
-    let dist=Math.sqrt(dx*dx+dy*dy);
-
-    t.x += (dx/dist)*t.speed;
-    t.y += (dy/dist)*t.speed;
-
-    if(dist < 40){
-      player.health--;
-      titans.splice(i,1);
-
-      if(player.health<=0){
-        gameState="gameover";
-      }
-    }
-  });
-
-  if(titans.length===0){
-    wave++;
-    spawnWave();
-  }
-}
-
-// ---------- DRAW PLAYER ----------
-function drawPlayer(){
-  let sprite = spriteMap[player.name];
-
-  let frameX = player.frame * SPRITE_SIZE;
-  let frameY = sprite.row * SPRITE_SIZE;
-
-  ctx.save();
-
-  if(player.facing === -1){
-    ctx.scale(-1,1);
-    ctx.drawImage(
-      spriteSheet,
-      frameX, frameY, SPRITE_SIZE, SPRITE_SIZE,
-      -player.x-64, player.y, 64, 64
-    );
-  } else {
-    ctx.drawImage(
-      spriteSheet,
-      frameX, frameY, SPRITE_SIZE, SPRITE_SIZE,
-      player.x, player.y, 64, 64
-    );
-  }
-
-  ctx.restore();
-}
-
-// ---------- DRAW ----------
-function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  drawPlayer();
-
-  titans.forEach(t=>{
-    ctx.fillStyle="red";
-    ctx.fillRect(t.x,t.y,40,60);
-  });
-
-  ctx.fillStyle="white";
-  ctx.fillText("HP: "+player.health,20,20);
-}
-
-// ---------- GAME OVER ----------
-function drawGameOver(){
   ctx.fillStyle="black";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  ctx.fillStyle="red";
-  ctx.font="40px Arial";
+  ctx.fillStyle="white";
+  ctx.font="30px Arial";
   ctx.textAlign="center";
-  ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2);
-}
+  ctx.fillText("IF YOU SEE THE IMAGE BELOW → IT WORKS", canvas.width/2, 100);
 
-// ---------- START ----------
-function startGame(){
-  player = createPlayer(characters[selectedCharacter]);
-  titans=[];
-  wave=1;
-  spawnWave();
-  gameState="playing";
+  // ✅ FORCE DRAW IMAGE
+  if(loaded){
+    ctx.drawImage(sprite, canvas.width/2 - 128, canvas.height/2 - 128, 256, 256);
+  } else {
+    ctx.fillStyle="red";
+    ctx.fillRect(canvas.width/2 - 50, canvas.height/2 - 50, 100, 100);
+  }
 }
 
 // ---------- LOOP ----------
 function gameLoop(){
   if(gameState==="loading") drawLoading();
   else if(gameState==="menu") drawMenu();
-  else if(gameState==="playing"){ update(); draw(); }
-  else if(gameState==="gameover") drawGameOver();
 
   requestAnimationFrame(gameLoop);
 }
