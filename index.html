@@ -21,17 +21,16 @@ canvas.height = window.innerHeight;
 let sprite = new Image();
 let loaded = false;
 
-sprite.onload = () => {
-  console.log("IMAGE LOADED");
-  loaded = true;
-};
-
-sprite.onerror = () => {
-  console.log("FAILED TO LOAD IMAGE");
-};
-
-// 🔴 CHANGE NAME IF NEEDED
+sprite.onload = () => loaded = true;
 sprite.src = "./sprites.png";
+
+// ---------- SETTINGS ----------
+const CHAR_WIDTH = 64;
+const CHAR_HEIGHT = 64;
+
+// ---------- CHARACTERS ----------
+let characters = ["Eren","Mikasa","Armin","Levi","Reiner","Annie"];
+let selectedCharacter = 0;
 
 // ---------- STATE ----------
 let gameState = "loading";
@@ -46,9 +45,7 @@ function drawLoading(){
   ctx.textAlign="center";
   ctx.fillText("LOADING...", canvas.width/2, canvas.height/2);
 
-  if(loaded){
-    gameState = "menu";
-  }
+  if(loaded) gameState = "menu";
 }
 
 // ---------- MENU ----------
@@ -56,24 +53,85 @@ function drawMenu(){
   ctx.fillStyle="black";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  ctx.fillStyle="white";
-  ctx.font="30px Arial";
-  ctx.textAlign="center";
-  ctx.fillText("IF YOU SEE THE IMAGE BELOW → IT WORKS", canvas.width/2, 100);
+  let startX = canvas.width/2 - (characters.length * 100)/2;
 
-  // ✅ FORCE DRAW IMAGE
-  if(loaded){
-    ctx.drawImage(sprite, canvas.width/2 - 128, canvas.height/2 - 128, 256, 256);
-  } else {
-    ctx.fillStyle="red";
-    ctx.fillRect(canvas.width/2 - 50, canvas.height/2 - 50, 100, 100);
+  characters.forEach((name,i)=>{
+    let x = startX + i*100;
+    let y = canvas.height/2;
+
+    // 🔥 each character = different X section
+    let sx = i * CHAR_WIDTH;
+
+    ctx.drawImage(
+      sprite,
+      sx, 0, CHAR_WIDTH, CHAR_HEIGHT,
+      x-32, y-32, 64, 64
+    );
+
+    if(i === selectedCharacter){
+      ctx.strokeStyle="yellow";
+      ctx.lineWidth=3;
+      ctx.strokeRect(x-40,y-40,80,80);
+    }
+
+    ctx.fillStyle="white";
+    ctx.fillText(name,x,y+60);
+  });
+}
+
+// ---------- PLAYER ----------
+let player;
+
+function startGame(){
+  player = {
+    x:canvas.width/2,
+    y:canvas.height/2,
+    frame:0,
+    facing:1,
+    index:selectedCharacter
+  };
+
+  gameState="playing";
+}
+
+// ---------- CONTROLS ----------
+document.addEventListener("keydown",e=>{
+  if(gameState==="menu"){
+    if(e.key==="ArrowLeft") selectedCharacter--;
+    if(e.key==="ArrowRight") selectedCharacter++;
+
+    if(selectedCharacter<0) selectedCharacter=characters.length-1;
+    if(selectedCharacter>=characters.length) selectedCharacter=0;
+
+    if(e.key==="Enter") startGame();
   }
+});
+
+// ---------- UPDATE ----------
+function update(){}
+
+// ---------- DRAW PLAYER ----------
+function drawPlayer(){
+  let sx = player.index * CHAR_WIDTH;
+
+  ctx.drawImage(
+    sprite,
+    sx, 0, CHAR_WIDTH, CHAR_HEIGHT,
+    player.x, player.y, 64, 64
+  );
+}
+
+// ---------- DRAW ----------
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawPlayer();
 }
 
 // ---------- LOOP ----------
 function gameLoop(){
   if(gameState==="loading") drawLoading();
   else if(gameState==="menu") drawMenu();
+  else if(gameState==="playing"){ update(); draw(); }
 
   requestAnimationFrame(gameLoop);
 }
