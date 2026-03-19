@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Titan Breaker</title>
+  <title>Titan Survival</title>
   <style>
     body { margin: 0; overflow: hidden; }
     canvas { display: block; background: skyblue; }
@@ -18,13 +18,7 @@
     canvas.height = window.innerHeight;
 
     // ----- Player -----
-    let player = {
-      x: 100,
-      y: 100,
-      size: 20,
-      speed: 5
-    };
-
+    let player = { x: 100, y: 100, size: 20, speed: 5, health: 3 };
     let keys = {};
     document.addEventListener("keydown", e => keys[e.key] = true);
     document.addEventListener("keyup", e => keys[e.key] = false);
@@ -37,80 +31,100 @@
       hook.active = true;
     });
 
-    // ----- Titan -----
-    let titan = {
-      x: 500,
-      y: 200,
-      width: 80,
-      height: 120,
-      speed: 1.2,
-      alive: true
-    };
-
-    function updateTitan() {
-      if (!titan.alive) return;
-
-      let dx = player.x - titan.x;
-      let dy = player.y - titan.y;
-      let dist = Math.sqrt(dx*dx + dy*dy);
-
-      titan.x += (dx / dist) * titan.speed;
-      titan.y += (dy / dist) * titan.speed;
+    // ----- Titans (swarm) -----
+    let titans = [];
+    function spawnTitan() {
+      titans.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        width: 80,
+        height: 120,
+        speed: 1 + Math.random(),  // random speed
+        health: 2
+      });
     }
 
-    // ----- Attack -----
+    // Spawn initial titans
+    for(let i=0;i<5;i++) spawnTitan();
+
+    // ----- Attack system -----
     let attacking = false;
     let attackTimer = 0;
-
     document.addEventListener("keydown", e => {
-      if (e.key === " ") {  // SPACE = attack
+      if(e.key === " ") { // SPACE = attack
         attacking = true;
         attackTimer = 10;
-        checkAttack();
+        checkAttacks();
       }
     });
 
-    function checkAttack() {
-      if (!titan.alive) return;
+    function checkAttacks() {
+      for(let t of titans) {
+        let neckX = t.x + t.width/2;
+        let neckY = t.y + 20;
+        let dx = player.x - neckX;
+        let dy = player.y - neckY;
+        let dist = Math.sqrt(dx*dx + dy*dy);
 
-      let neckX = titan.x + titan.width/2;
-      let neckY = titan.y + 20;
-
-      let dx = player.x - neckX;
-      let dy = player.y - neckY;
-      let dist = Math.sqrt(dx*dx + dy*dy);
-
-      if (dist < 30) titan.alive = false;
+        if(attacking && dist < 30) {
+          t.health--;
+          if(t.health <= 0) {
+            titans.splice(titans.indexOf(t), 1);
+            spawnTitan(); // respawn new titan
+          }
+        }
+      }
     }
 
     // ----- Update -----
     function update() {
       // Player movement
-      if (keys["w"]) player.y -= player.speed;
-      if (keys["s"]) player.y += player.speed;
-      if (keys["a"]) player.x -= player.speed;
-      if (keys["d"]) player.x += player.speed;
+      if(keys["w"]) player.y -= player.speed;
+      if(keys["s"]) player.y += player.speed;
+      if(keys["a"]) player.x -= player.speed;
+      if(keys["d"]) player.x += player.speed;
 
       // Grapple movement
-      if (hook.active) {
+      if(hook.active) {
         let dx = hook.x - player.x;
         let dy = hook.y - player.y;
         player.x += dx * 0.05;
         player.y += dy * 0.05;
       }
 
-      // Titan movement
-      updateTitan();
+      // Titans move toward player
+      for(let t of titans) {
+        let dx = player.x - t.x;
+        let dy = player.y - t.y;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+        t.x += (dx / dist) * t.speed;
+        t.y += (dy / dist) * t.speed;
+
+        // Collision with player = lose health
+        if(Math.abs(player.x - t.x) < t.width/2 + player.size/2 &&
+           Math.abs(player.y - t.y) < t.height/2 + player.size/2) {
+          player.health--;
+          t.x = Math.random() * canvas.width;
+          t.y = Math.random() * canvas.height;
+          if(player.health <= 0) alert("Game Over! Reload to play again.");
+        }
+      }
+
+      // Decrease attack timer
+      if(attacking) {
+        attackTimer--;
+        if(attackTimer <= 0) attacking = false;
+      }
     }
 
     // ----- Draw -----
     function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0,0,canvas.width,canvas.height);
 
       // Grapple line
-      if (hook.active) {
+      if(hook.active) {
         ctx.beginPath();
-        ctx.moveTo(player.x, player.y);
+        ctx.moveTo(player.x + player.size/2, player.y + player.size/2);
         ctx.lineTo(hook.x, hook.y);
         ctx.stroke();
       }
@@ -119,25 +133,28 @@
       ctx.fillStyle = "black";
       ctx.fillRect(player.x, player.y, player.size, player.size);
 
-      // Titan
-      if (titan.alive) {
+      // Titans
+      for(let t of titans) {
         ctx.fillStyle = "red";
-        ctx.fillRect(titan.x, titan.y, titan.width, titan.height);
+        ctx.fillRect(t.x, t.y, t.width, t.height);
 
-        // Weak spot (neck)
+        // Weak spot
         ctx.fillStyle = "yellow";
-        ctx.fillRect(titan.x + titan.width/2 - 5, titan.y + 20, 10, 10);
+        ctx.fillRect(t.x + t.width/2 - 5, t.y + 20, 10, 10);
       }
 
       // Slash effect
-      if (attacking) {
+      if(attacking) {
         ctx.strokeStyle = "white";
         ctx.beginPath();
         ctx.arc(player.x + player.size/2, player.y + player.size/2, 40, 0, Math.PI*2);
         ctx.stroke();
+      }
 
-        attackTimer--;
-        if (attackTimer <= 0) attacking = false;
+      // Player health
+      ctx.fillStyle = "green";
+      for(let i=0;i<player.health;i++){
+        ctx.fillRect(20 + i*25, 20, 20, 20);
       }
     }
 
@@ -147,8 +164,8 @@
       draw();
       requestAnimationFrame(gameLoop);
     }
-
     gameLoop();
+
   </script>
 </body>
 </html>
