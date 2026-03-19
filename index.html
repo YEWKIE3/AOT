@@ -17,22 +17,19 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// ---------- IMAGE ----------
-let sprite = new Image();
-let loaded = false;
-
-sprite.onload = () => {
-  console.log("IMAGE LOADED");
-  loaded = true;
-};
-
-sprite.src = "./sprites.png";
-
 // ---------- STATE ----------
-let gameState = "loading";
+let gameState = "menu";
 
 // ---------- CHARACTERS ----------
-let characters = ["Eren","Mikasa","Armin","Levi","Reiner","Annie"];
+let characters = [
+ {name:"Eren",color:"green",speed:5,health:3},
+ {name:"Mikasa",color:"red",speed:7,health:2},
+ {name:"Armin",color:"yellow",speed:4,health:3},
+ {name:"Levi",color:"purple",speed:6,health:2},
+ {name:"Reiner",color:"orange",speed:3,health:5},
+ {name:"Annie",color:"pink",speed:5,health:3}
+];
+
 let selectedCharacter = 0;
 
 // ---------- PLAYER ----------
@@ -40,7 +37,6 @@ let player;
 
 // ---------- TITANS ----------
 let titans=[];
-let wave=1;
 
 // ---------- CONTROLS ----------
 let keys={};
@@ -67,14 +63,19 @@ document.addEventListener("keyup",e=>keys[e.key]=false);
 
 // ---------- START ----------
 function startGame(){
+  let c = characters[selectedCharacter];
+
   player = {
     x:canvas.width/2,
     y:canvas.height/2,
-    health:3
+    speed:c.speed,
+    health:c.health,
+    color:c.color,
+    frame:0,
+    frameTick:0
   };
 
   titans=[];
-  wave=1;
   spawnWave();
 
   gameState="playing";
@@ -93,10 +94,19 @@ function spawnWave(){
 
 // ---------- UPDATE ----------
 function update(){
-  if(keys["w"]) player.y-=5;
-  if(keys["s"]) player.y+=5;
-  if(keys["a"]) player.x-=5;
-  if(keys["d"]) player.x+=5;
+  let moving = false;
+
+  if(keys["w"]){ player.y-=player.speed; moving=true; }
+  if(keys["s"]){ player.y+=player.speed; moving=true; }
+  if(keys["a"]){ player.x-=player.speed; moving=true; }
+  if(keys["d"]){ player.x+=player.speed; moving=true; }
+
+  // animation
+  player.frameTick++;
+  if(player.frameTick > 10){
+    player.frame = (player.frame + 1) % 2;
+    player.frameTick = 0;
+  }
 
   titans.forEach((t,i)=>{
     let dx=player.x-t.x;
@@ -115,62 +125,65 @@ function update(){
       }
     }
   });
+
+  if(titans.length===0) spawnWave();
 }
 
-// ---------- DRAW MENU ----------
+// ---------- PIXEL CHARACTER ----------
+function drawCharacter(x,y,color,frame){
+  ctx.fillStyle=color;
+
+  // body
+  ctx.fillRect(x, y, 20, 30);
+
+  // head
+  ctx.fillStyle="white";
+  ctx.fillRect(x+4, y-10, 12, 10);
+
+  // legs animation
+  ctx.fillStyle=color;
+  if(frame === 0){
+    ctx.fillRect(x, y+30, 6, 10);
+    ctx.fillRect(x+14, y+30, 6, 10);
+  } else {
+    ctx.fillRect(x+4, y+30, 6, 10);
+    ctx.fillRect(x+10, y+30, 6, 10);
+  }
+}
+
+// ---------- MENU ----------
 function drawMenu(){
   ctx.fillStyle="black";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  ctx.fillStyle="white";
-  ctx.font="30px Arial";
-  ctx.textAlign="center";
-  ctx.fillText("SELECT CHARACTER", canvas.width/2, 100);
-
   let startX = canvas.width/2 - (characters.length * 100)/2;
 
-  characters.forEach((name,i)=>{
+  characters.forEach((c,i)=>{
     let x = startX + i*100;
     let y = canvas.height/2;
 
-    // ✅ ALWAYS SHOW TOP-LEFT OF IMAGE
-    if(loaded){
-      ctx.drawImage(sprite, 0, 0, 128, 128, x-32, y-32, 64, 64);
-    } else {
-      ctx.fillStyle="gray";
-      ctx.fillRect(x-40,y-40,80,80);
-    }
+    drawCharacter(x-10,y-10,c.color,0);
 
-    if(i === selectedCharacter){
+    if(i===selectedCharacter){
       ctx.strokeStyle="yellow";
-      ctx.lineWidth=3;
-      ctx.strokeRect(x-40,y-40,80,80);
+      ctx.strokeRect(x-20,y-20,40,60);
     }
 
     ctx.fillStyle="white";
-    ctx.fillText(name,x,y+60);
+    ctx.fillText(c.name,x,y+50);
   });
-}
-
-// ---------- DRAW PLAYER ----------
-function drawPlayer(){
-  if(loaded){
-    ctx.drawImage(sprite, 0, 0, 128, 128, player.x, player.y, 64, 64);
-  } else {
-    ctx.fillStyle="blue";
-    ctx.fillRect(player.x,player.y,50,50);
-  }
 }
 
 // ---------- DRAW ----------
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  drawPlayer();
+  drawCharacter(player.x, player.y, player.color, player.frame);
 
+  // titans
   titans.forEach(t=>{
     ctx.fillStyle="red";
-    ctx.fillRect(t.x,t.y,40,60);
+    ctx.fillRect(t.x,t.y,30,50);
   });
 
   ctx.fillStyle="white";
@@ -190,16 +203,7 @@ function drawGameOver(){
 
 // ---------- LOOP ----------
 function gameLoop(){
-  if(gameState==="loading"){
-    ctx.fillStyle="black";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    ctx.fillStyle="white";
-    ctx.fillText("LOADING...", canvas.width/2, canvas.height/2);
-
-    if(loaded) gameState="menu";
-  }
-  else if(gameState==="menu") drawMenu();
+  if(gameState==="menu") drawMenu();
   else if(gameState==="playing"){ update(); draw(); }
   else if(gameState==="gameover") drawGameOver();
 
