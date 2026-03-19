@@ -3,169 +3,236 @@
 <head>
   <title>Titan Survival</title>
   <style>
-    body { margin: 0; overflow: hidden; }
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap'); /* placeholder for DItTy font */
+
+    body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Press Start 2P', monospace; }
     canvas { display: block; background: skyblue; }
+    #ui { position: absolute; top: 0; left: 0; color: white; font-size: 20px; padding: 10px; }
+    button { font-family: 'Press Start 2P', monospace; font-size: 14px; padding: 5px; margin: 5px; }
   </style>
 </head>
 <body>
   <canvas id="game"></canvas>
+  <div id="ui"></div>
 
   <script>
-    // ----- Canvas setup -----
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    // ----- Player -----
-    let player = { x: 100, y: 100, size: 20, speed: 5, health: 3 };
-    let keys = {};
-    document.addEventListener("keydown", e => keys[e.key] = true);
-    document.addEventListener("keyup", e => keys[e.key] = false);
+    let ui = document.getElementById("ui");
 
-    // ----- Grappling hook -----
-    let hook = { active: false, x: 0, y: 0 };
-    canvas.addEventListener("click", (e) => {
-      hook.x = e.clientX;
-      hook.y = e.clientY;
-      hook.active = true;
-    });
+    // ----- Game states -----
+    let gameState = "loading"; // loading, menu, playing, gameover
 
-    // ----- Titans (swarm) -----
-    let titans = [];
-    function spawnTitan() {
-      titans.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        width: 80,
-        height: 120,
-        speed: 1 + Math.random(),  // random speed
-        health: 2
-      });
+    // ----- Loading -----
+    let loadingTimer = 0;
+    function drawLoading() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = "black";
+      ctx.font = "50px 'Press Start 2P'";
+      ctx.textAlign = "center";
+      ctx.fillText("LOADING...", canvas.width/2, canvas.height/2);
+      loadingTimer++;
+      if(loadingTimer > 100) gameState = "menu"; // move to menu after some frames
     }
 
-    // Spawn initial titans
-    for(let i=0;i<5;i++) spawnTitan();
+    // ----- Menu / Character Select -----
+    let selectedCharacter = 0;
+    let characters = ["Character 1","Character 2","Character 3"];
+    function drawMenu() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = "black";
+      ctx.font = "40px 'Press Start 2P'";
+      ctx.textAlign = "center";
+      ctx.fillText("SELECT CHARACTER", canvas.width/2, 100);
 
-    // ----- Attack system -----
+      characters.forEach((char,i)=>{
+        ctx.fillStyle = i===selectedCharacter ? "yellow":"white";
+        ctx.fillText(char, canvas.width/2, 200+i*60);
+      });
+
+      ctx.fillText("Press LEFT/RIGHT to select, ENTER to start", canvas.width/2, canvas.height-100);
+    }
+
+    // ----- Player -----
+    let player = { x: canvas.width/2, y: canvas.height/2, size: 20, speed: 5, health: 3, coins:0 };
+
+    // ----- Controls -----
+    let keys = {};
+    document.addEventListener("keydown", e => {
+      keys[e.key] = true;
+
+      if(gameState==="menu"){
+        if(e.key==="ArrowLeft") selectedCharacter = (selectedCharacter-1+characters.length)%characters.length;
+        if(e.key==="ArrowRight") selectedCharacter = (selectedCharacter+1)%characters.length;
+        if(e.key==="Enter") startGame();
+      }
+    });
+    document.addEventListener("keyup", e => keys[e.key] = false);
+
+    function startGame(){
+      gameState="playing";
+      player.x = canvas.width/2;
+      player.y = canvas.height/2;
+      player.health = 3;
+      player.coins = 0;
+      waveNumber=1;
+      titans=[];
+      spawnWave(waveNumber);
+    }
+
+    // ----- Titans -----
+    let titans = [];
+    let waveNumber = 1;
+
+    function spawnWave(wave){
+      for(let i=0;i<wave+4;i++){ // increase titans per wave
+        titans.push({
+          x: Math.random()*canvas.width,
+          y: Math.random()*canvas.height,
+          width: 80,
+          height: 120,
+          speed: 1 + Math.random(),
+          health: 2
+        });
+      }
+    }
+
+    // ----- Attacks -----
     let attacking = false;
     let attackTimer = 0;
-    document.addEventListener("keydown", e => {
-      if(e.key === " ") { // SPACE = attack
+
+    document.addEventListener("keydown", e=>{
+      if(gameState==="playing" && e.key===" "){
         attacking = true;
         attackTimer = 10;
-        checkAttacks();
       }
     });
 
-    function checkAttacks() {
-      for(let t of titans) {
+    function checkAttacks(){
+      titans.forEach((t)=>{
         let neckX = t.x + t.width/2;
         let neckY = t.y + 20;
         let dx = player.x - neckX;
         let dy = player.y - neckY;
-        let dist = Math.sqrt(dx*dx + dy*dy);
+        let dist = Math.sqrt(dx*dx+dy*dy);
 
-        if(attacking && dist < 30) {
+        if(attacking && dist < 30){
           t.health--;
-          if(t.health <= 0) {
-            titans.splice(titans.indexOf(t), 1);
-            spawnTitan(); // respawn new titan
+          if(t.health<=0){
+            titans.splice(titans.indexOf(t),1);
+            player.coins += 1;
           }
         }
-      }
+      });
     }
 
     // ----- Update -----
-    function update() {
+    function update(){
       // Player movement
       if(keys["w"]) player.y -= player.speed;
       if(keys["s"]) player.y += player.speed;
       if(keys["a"]) player.x -= player.speed;
       if(keys["d"]) player.x += player.speed;
 
-      // Grapple movement
-      if(hook.active) {
-        let dx = hook.x - player.x;
-        let dy = hook.y - player.y;
-        player.x += dx * 0.05;
-        player.y += dy * 0.05;
-      }
-
-      // Titans move toward player
-      for(let t of titans) {
+      // Titans move
+      titans.forEach((t)=>{
         let dx = player.x - t.x;
         let dy = player.y - t.y;
         let dist = Math.sqrt(dx*dx + dy*dy);
-        t.x += (dx / dist) * t.speed;
-        t.y += (dy / dist) * t.speed;
+        t.x += (dx/dist)*t.speed;
+        t.y += (dy/dist)*t.speed;
 
-        // Collision with player = lose health
+        // Collision with player
         if(Math.abs(player.x - t.x) < t.width/2 + player.size/2 &&
-           Math.abs(player.y - t.y) < t.height/2 + player.size/2) {
+           Math.abs(player.y - t.y) < t.height/2 + player.size/2){
           player.health--;
-          t.x = Math.random() * canvas.width;
-          t.y = Math.random() * canvas.height;
-          if(player.health <= 0) alert("Game Over! Reload to play again.");
+          t.x = Math.random()*canvas.width;
+          t.y = Math.random()*canvas.height;
+          if(player.health<=0) gameState="gameover";
         }
+      });
+
+      if(attacking){
+        attackTimer--;
+        if(attackTimer<=0) attacking=false;
       }
 
-      // Decrease attack timer
-      if(attacking) {
-        attackTimer--;
-        if(attackTimer <= 0) attacking = false;
+      checkAttacks();
+
+      // Wave complete
+      if(titans.length===0){
+        waveNumber++;
+        spawnWave(waveNumber);
       }
     }
 
     // ----- Draw -----
-    function draw() {
+    function draw(){
       ctx.clearRect(0,0,canvas.width,canvas.height);
-
-      // Grapple line
-      if(hook.active) {
-        ctx.beginPath();
-        ctx.moveTo(player.x + player.size/2, player.y + player.size/2);
-        ctx.lineTo(hook.x, hook.y);
-        ctx.stroke();
-      }
 
       // Player
       ctx.fillStyle = "black";
       ctx.fillRect(player.x, player.y, player.size, player.size);
 
       // Titans
-      for(let t of titans) {
-        ctx.fillStyle = "red";
+      titans.forEach((t)=>{
+        ctx.fillStyle="red";
         ctx.fillRect(t.x, t.y, t.width, t.height);
-
-        // Weak spot
-        ctx.fillStyle = "yellow";
-        ctx.fillRect(t.x + t.width/2 - 5, t.y + 20, 10, 10);
-      }
+        ctx.fillStyle="yellow";
+        ctx.fillRect(t.x + t.width/2 -5, t.y+20, 10, 10);
+      });
 
       // Slash effect
-      if(attacking) {
-        ctx.strokeStyle = "white";
+      if(attacking){
+        ctx.strokeStyle="white";
         ctx.beginPath();
-        ctx.arc(player.x + player.size/2, player.y + player.size/2, 40, 0, Math.PI*2);
+        ctx.arc(player.x + player.size/2, player.y + player.size/2, 40,0,Math.PI*2);
         ctx.stroke();
       }
 
-      // Player health
-      ctx.fillStyle = "green";
+      // Player Health
+      ctx.fillStyle="green";
       for(let i=0;i<player.health;i++){
-        ctx.fillRect(20 + i*25, 20, 20, 20);
+        ctx.fillRect(20+i*25,20,20,20);
       }
+
+      // Coins and Wave
+      ctx.fillStyle="gold";
+      ctx.fillText("Coins: "+player.coins, 20, 70);
+      ctx.fillStyle="white";
+      ctx.fillText("Wave: "+waveNumber, 20, 100);
     }
 
-    // ----- Game loop -----
-    function gameLoop() {
-      update();
-      draw();
+    // ----- Game Over -----
+    function drawGameOver(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle="black";
+      ctx.font="50px 'Press Start 2P'";
+      ctx.textAlign="center";
+      ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2-50);
+      ctx.font="30px 'Press Start 2P'";
+      ctx.fillText("Coins Collected: "+player.coins, canvas.width/2, canvas.height/2+20);
+      ctx.fillText("Press ENTER to Restart", canvas.width/2, canvas.height/2+70);
+    }
+
+    // Restart listener
+    document.addEventListener("keydown", e=>{
+      if(gameState==="gameover" && e.key==="Enter") startGame();
+    });
+
+    // ----- Main loop -----
+    function gameLoop(){
+      if(gameState==="loading") drawLoading();
+      else if(gameState==="menu") drawMenu();
+      else if(gameState==="playing"){ update(); draw(); }
+      else if(gameState==="gameover") drawGameOver();
       requestAnimationFrame(gameLoop);
     }
-    gameLoop();
 
+    gameLoop();
   </script>
 </body>
 </html>
