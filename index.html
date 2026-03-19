@@ -1,131 +1,131 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Titan Survival</title>
+  <title>AOT Survival</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-
-    body { margin:0; overflow:hidden; background:#1e1e2f; font-family:'Press Start 2P', monospace;}
-    canvas { display:block; }
+    body{margin:0;overflow:hidden;background:#1e1e2f;font-family:'Press Start 2P',monospace;}
+    canvas{display:block;}
   </style>
 </head>
 <body>
-
 <canvas id="game"></canvas>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
 
 // ---------- STATE ----------
-let gameState = "loading";
+let gameState="loading";
+let loadingTimer=0;
 
 // ---------- LOADING ----------
-let loadingTimer = 0;
 function drawLoading(){
   ctx.fillStyle="#1e1e2f";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  let progress = loadingTimer / 120;
+  let progress=loadingTimer/120;
 
   ctx.fillStyle="white";
   ctx.font="50px 'Press Start 2P'";
   ctx.textAlign="center";
-  ctx.fillText("LOADING...", canvas.width/2, canvas.height/2 - 40);
+  ctx.fillText("LOADING...",canvas.width/2,canvas.height/2-40);
 
   ctx.fillStyle="gray";
-  ctx.fillRect(canvas.width/2 - 150, canvas.height/2, 300, 20);
+  ctx.fillRect(canvas.width/2-150,canvas.height/2,300,20);
 
   ctx.fillStyle="lime";
-  ctx.fillRect(canvas.width/2 - 150, canvas.height/2, 300 * progress, 20);
+  ctx.fillRect(canvas.width/2-150,canvas.height/2,300*progress,20);
 
   loadingTimer++;
-  if(loadingTimer > 120) gameState = "menu";
+  if(loadingTimer>120) gameState="menu";
 }
 
 // ---------- GLOBAL COINS ----------
-let totalCoins = 0;
+let totalCoins=0;
 
 // ---------- CHARACTERS ----------
-let characters = [
-  {name:"Scout", speed:5, health:3, range:40, ability:"none", rarity:"common", unlocked:true},
-  {name:"Speedster", speed:8, health:2, range:30, ability:"dash", rarity:"rare", unlocked:false, cost:10},
-  {name:"Blade", speed:5, health:2, range:70, ability:"spin", rarity:"epic", unlocked:false, cost:20},
-  {name:"Tank", speed:3, health:5, range:50, ability:"rage", rarity:"rare", unlocked:false, cost:15}
+let characters=[
+ {name:"Eren",speed:5,health:3,range:40,ability:"rage",rarity:"common",unlocked:true,color:"green"},
+ {name:"Mikasa",speed:8,health:2,range:30,ability:"dash",rarity:"rare",unlocked:false,cost:10,color:"red"},
+ {name:"Armin",speed:4,health:3,range:50,ability:"mark",rarity:"rare",unlocked:false,cost:12,color:"yellow"},
+ {name:"Levi",speed:7,health:2,range:70,ability:"spin",rarity:"epic",unlocked:false,cost:20,color:"purple"},
+ {name:"Reiner",speed:3,health:5,range:50,ability:"armor",rarity:"rare",unlocked:false,cost:15,color:"brown"},
+ {name:"Annie",speed:5,health:3,range:45,ability:"counter",rarity:"epic",unlocked:false,cost:18,color:"pink"}
 ];
 
 function getRarityColor(r){
-  if(r==="common") return "white";
-  if(r==="rare") return "blue";
-  if(r==="epic") return "purple";
+ if(r==="common") return "white";
+ if(r==="rare") return "blue";
+ if(r==="epic") return "purple";
 }
 
 // ---------- MENU ----------
-let selectedCharacter = 0;
+let selectedCharacter=0;
 
 function drawMenu(){
-  ctx.fillStyle="#1e1e2f";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.fillStyle="#1e1e2f";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ ctx.fillStyle="white";
+ ctx.font="30px 'Press Start 2P'";
+ ctx.textAlign="center";
+ ctx.fillText("SELECT CHARACTER",canvas.width/2,80);
+
+ let startX=canvas.width/2-(characters.length*120)/2;
+
+ characters.forEach((c,i)=>{
+  let x=startX+i*120;
+  let y=canvas.height/2;
+
+  ctx.fillStyle=getRarityColor(c.rarity);
+  ctx.fillRect(x-40,y-40,80,80);
+
+  ctx.fillStyle=c.color;
+  ctx.fillRect(x-20,y-20,40,40);
+
+  if(!c.unlocked){
+   ctx.fillStyle="rgba(0,0,0,0.6)";
+   ctx.fillRect(x-40,y-40,80,80);
+   ctx.fillStyle="red";
+   ctx.font="10px 'Press Start 2P'";
+   ctx.fillText(c.cost+"C",x,y);
+  }
+
+  if(i===selectedCharacter){
+   ctx.strokeStyle="yellow";
+   ctx.lineWidth=3;
+   ctx.strokeRect(x-40,y-40,80,80);
+  }
 
   ctx.fillStyle="white";
-  ctx.font="40px 'Press Start 2P'";
-  ctx.textAlign="center";
-  ctx.fillText("SELECT CHARACTER", canvas.width/2, 100);
+  ctx.font="10px 'Press Start 2P'";
+  ctx.fillText(c.name,x,y+60);
+ });
 
-  let startX = canvas.width/2 - (characters.length*140)/2;
-
-  characters.forEach((char,i)=>{
-    let x = startX + i*140;
-    let y = canvas.height/2;
-
-    ctx.fillStyle = getRarityColor(char.rarity);
-    ctx.fillRect(x-50,y-50,100,100);
-
-    if(!char.unlocked){
-      ctx.fillStyle="rgba(0,0,0,0.6)";
-      ctx.fillRect(x-50,y-50,100,100);
-
-      ctx.fillStyle="red";
-      ctx.font="10px 'Press Start 2P'";
-      ctx.fillText(char.cost+"C", x, y);
-    }
-
-    if(i===selectedCharacter){
-      ctx.strokeStyle="yellow";
-      ctx.lineWidth=4;
-      ctx.strokeRect(x-50,y-50,100,100);
-    }
-
-    ctx.fillStyle="black";
-    ctx.fillText(char.name, x, y+80);
-  });
-
-  ctx.fillStyle="gold";
-  ctx.fillText("Coins: "+totalCoins, canvas.width/2, canvas.height-120);
-
-  ctx.fillStyle="white";
-  ctx.font="15px 'Press Start 2P'";
-  ctx.fillText("ARROWS TO SELECT • ENTER TO PLAY/UNLOCK", canvas.width/2, canvas.height-60);
+ ctx.fillStyle="gold";
+ ctx.fillText("Coins: "+totalCoins,canvas.width/2,canvas.height-100);
+ ctx.fillText("ENTER = PLAY / BUY",canvas.width/2,canvas.height-60);
 }
 
 // ---------- PLAYER ----------
 let player;
 
-function createPlayer(char){
-  return {
-    x: canvas.width/2,
-    y: canvas.height/2,
-    width:30,
-    height:30,
-    speed:char.speed,
-    health:char.health,
-    maxHealth:char.health,
-    coins:0,
-    range:char.range,
-    ability:char.ability
-  };
+function createPlayer(c){
+ return{
+  x:canvas.width/2,
+  y:canvas.height/2,
+  width:30,height:30,
+  speed:c.speed,
+  health:c.health,
+  maxHealth:c.health,
+  coins:0,
+  range:c.range,
+  ability:c.ability,
+  color:c.color
+ };
 }
 
 // ---------- TITANS ----------
@@ -133,228 +133,195 @@ let titans=[];
 let wave=1;
 
 function spawnWave(){
-  for(let i=0;i<wave+3;i++){
-    titans.push({
-      x: Math.random()*canvas.width,
-      y: Math.random()*canvas.height,
-      width:60,
-      height:100,
-      speed:1+Math.random(),
-      health:2
-    });
-  }
+ for(let i=0;i<wave+3;i++){
+  titans.push({
+   x:Math.random()*canvas.width,
+   y:Math.random()*canvas.height,
+   width:60,height:100,
+   speed:1+Math.random(),
+   health:2
+  });
+ }
 }
 
 // ---------- CONTROLS ----------
 let keys={};
-document.addEventListener("keydown", e=>{
-  keys[e.key]=true;
+document.addEventListener("keydown",e=>{
+ keys[e.key]=true;
 
-  if(gameState==="menu"){
-    if(e.key==="ArrowLeft") selectedCharacter=(selectedCharacter-1+characters.length)%characters.length;
-    if(e.key==="ArrowRight") selectedCharacter=(selectedCharacter+1)%characters.length;
+ if(gameState==="menu"){
+  if(e.key==="ArrowLeft") selectedCharacter=(selectedCharacter-1+characters.length)%characters.length;
+  if(e.key==="ArrowRight") selectedCharacter=(selectedCharacter+1)%characters.length;
 
-    if(e.key==="Enter"){
-      let char = characters[selectedCharacter];
-      if(char.unlocked){
-        startGame();
-      } else if(totalCoins >= char.cost){
-        totalCoins -= char.cost;
-        char.unlocked = true;
-      }
-    }
+  if(e.key==="Enter"){
+   let c=characters[selectedCharacter];
+   if(c.unlocked) startGame();
+   else if(totalCoins>=c.cost){totalCoins-=c.cost;c.unlocked=true;}
   }
+ }
 
-  if(gameState==="playing" && e.key===" "){
-    attacking=true;
-    attackTimer=10;
-  }
+ if(gameState==="playing" && e.key===" "){attacking=true;attackTimer=10;}
 
-  if(gameState==="playing" && e.key==="e" && abilityCooldown<=0){
-    if(player.ability==="dash") dash();
-    if(player.ability==="spin") spinAttack();
-    if(player.ability==="rage") rageMode();
-    abilityCooldown=120;
-  }
+ if(gameState==="playing" && e.key==="e" && abilityCooldown<=0){
+  useAbility();
+  abilityCooldown=120;
+ }
 
-  if(gameState==="gameover" && e.key==="Enter") startGame();
+ if(gameState==="gameover" && e.key==="Enter") startGame();
 });
-
-document.addEventListener("keyup", e=>keys[e.key]=false);
-
-// ---------- COLLISION ----------
-function rectCollision(a,b){
-  return a.x<b.x+b.width && a.x+a.width>b.x && a.y<b.y+b.height && a.y+a.height>b.y;
-}
-
-function circleCollision(x1,y1,r1,x2,y2,r2){
-  let dx=x1-x2, dy=y1-y2;
-  return Math.sqrt(dx*dx+dy*dy)<r1+r2;
-}
-
-// ---------- ATTACK ----------
-let attacking=false;
-let attackTimer=0;
-
-function handleAttack(){
-  titans.forEach((t,i)=>{
-    let nx=t.x+t.width/2;
-    let ny=t.y+20;
-
-    if(circleCollision(player.x+player.width/2,player.y+player.height/2,player.range,nx,ny,15)){
-      t.health--;
-      if(t.health<=0){
-        titans.splice(i,1);
-        player.coins++;
-      }
-    }
-  });
-}
+document.addEventListener("keyup",e=>keys[e.key]=false);
 
 // ---------- ABILITIES ----------
 let abilityCooldown=0;
 
-function dash(){
-  if(keys["d"]) player.x+=100;
-  if(keys["a"]) player.x-=100;
-  if(keys["w"]) player.y-=100;
-  if(keys["s"]) player.y+=100;
-}
+function useAbility(){
+ if(player.ability==="dash"){
+  if(keys["d"]) player.x+=120;
+  if(keys["a"]) player.x-=120;
+  if(keys["w"]) player.y-=120;
+  if(keys["s"]) player.y+=120;
+ }
 
-function spinAttack(){
+ if(player.ability==="spin"){
   titans.forEach((t,i)=>{
-    let dx=player.x-t.x, dy=player.y-t.y;
-    if(Math.sqrt(dx*dx+dy*dy)<player.range+40){
-      titans.splice(i,1);
-      player.coins++;
-    }
+   let dx=player.x-t.x,dy=player.y-t.y;
+   if(Math.sqrt(dx*dx+dy*dy)<player.range+50){
+    titans.splice(i,1);
+    player.coins++;
+   }
   });
+ }
+
+ if(player.ability==="rage"){
+  player.speed*=1.5;
+  setTimeout(()=>player.speed/=1.5,3000);
+ }
+
+ if(player.ability==="armor"){
+  player.health+=2;
+ }
+
+ if(player.ability==="counter"){
+  titans=[];
+ }
+
+ if(player.ability==="mark"){
+  titans.forEach(t=>t.health=1);
+ }
 }
 
-function rageMode(){
-  player.speed*=1.5;
-  player.range+=20;
-  setTimeout(()=>{
-    player.speed/=1.5;
-    player.range-=20;
-  },3000);
+// ---------- ATTACK ----------
+let attacking=false,attackTimer=0;
+
+function attack(){
+ titans.forEach((t,i)=>{
+  let dx=player.x-t.x,dy=player.y-t.y;
+  if(Math.sqrt(dx*dx+dy*dy)<player.range){
+   t.health--;
+   if(t.health<=0){titans.splice(i,1);player.coins++;}
+  }
+ });
 }
 
 // ---------- UPDATE ----------
 function update(){
-  if(keys["w"]) player.y-=player.speed;
-  if(keys["s"]) player.y+=player.speed;
-  if(keys["a"]) player.x-=player.speed;
-  if(keys["d"]) player.x+=player.speed;
+ if(keys["w"]) player.y-=player.speed;
+ if(keys["s"]) player.y+=player.speed;
+ if(keys["a"]) player.x-=player.speed;
+ if(keys["d"]) player.x+=player.speed;
 
-  titans.forEach(t=>{
-    let dx=player.x-t.x, dy=player.y-t.y;
-    let dist=Math.sqrt(dx*dx+dy*dy);
-    t.x+=(dx/dist)*t.speed;
-    t.y+=(dy/dist)*t.speed;
+ titans.forEach(t=>{
+  let dx=player.x-t.x,dy=player.y-t.y;
+  let dist=Math.sqrt(dx*dx+dy*dy);
+  t.x+=(dx/dist)*t.speed;
+  t.y+=(dy/dist)*t.speed;
 
-    if(rectCollision(player,t)){
-      player.health--;
-      t.x=Math.random()*canvas.width;
-      t.y=Math.random()*canvas.height;
-      if(player.health<=0) gameState="gameover";
-    }
-  });
-
-  if(attacking){
-    attackTimer--;
-    handleAttack();
-    if(attackTimer<=0) attacking=false;
+  if(dist<40){
+   player.health--;
+   t.x=Math.random()*canvas.width;
+   t.y=Math.random()*canvas.height;
+   if(player.health<=0) gameState="gameover";
   }
+ });
 
-  if(abilityCooldown>0) abilityCooldown--;
+ if(attacking){
+  attackTimer--;
+  attack();
+  if(attackTimer<=0) attacking=false;
+ }
 
-  if(titans.length===0){
-    wave++;
-    spawnWave();
-  }
+ if(abilityCooldown>0) abilityCooldown--;
+
+ if(titans.length===0){wave++;spawnWave();}
 }
 
 // ---------- DRAW ----------
 function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+ ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  let pulse = Math.sin(Date.now()*0.01)*2;
-  ctx.fillStyle="black";
-  ctx.fillRect(player.x, player.y+pulse, player.width, player.height);
+ let pulse=Math.sin(Date.now()*0.01)*2;
+ ctx.fillStyle=player.color;
+ ctx.fillRect(player.x,player.y+pulse,30,30);
 
-  titans.forEach(t=>{
-    ctx.fillStyle="red";
-    ctx.fillRect(t.x,t.y,t.width,t.height);
+ titans.forEach(t=>{
+  ctx.fillStyle="red";
+  ctx.fillRect(t.x,t.y,t.width,t.height);
+ });
 
-    ctx.fillStyle="yellow";
-    ctx.fillRect(t.x+t.width/2-5,t.y+20,10,10);
-  });
+ if(attacking){
+  ctx.strokeStyle="white";
+  ctx.beginPath();
+  ctx.arc(player.x+15,player.y+15,player.range,0,Math.PI*2);
+  ctx.stroke();
+ }
 
-  if(attacking){
-    ctx.strokeStyle="white";
-    ctx.beginPath();
-    ctx.arc(player.x+15,player.y+15,player.range,0,Math.PI*2);
-    ctx.stroke();
-  }
+ // HUD
+ ctx.fillStyle="gray";ctx.fillRect(20,20,150,20);
+ ctx.fillStyle="lime";ctx.fillRect(20,20,(player.health/player.maxHealth)*150,20);
 
-  // HUD
-  ctx.fillStyle="gray";
-  ctx.fillRect(20,20,150,20);
-  ctx.fillStyle="lime";
-  ctx.fillRect(20,20,(player.health/player.maxHealth)*150,20);
+ ctx.fillStyle="gold";ctx.fillText("Coins:"+player.coins,20,70);
+ ctx.fillStyle="white";ctx.fillText("Wave:"+wave,20,100);
 
-  ctx.fillStyle="gold";
-  ctx.fillText("Coins: "+player.coins,20,70);
-
-  ctx.fillStyle="white";
-  ctx.fillText("Wave: "+wave,20,100);
-
-  ctx.fillText("Ability",20,140);
-  ctx.fillStyle=abilityCooldown>0?"red":"lime";
-  ctx.fillRect(20,150,100*(1-abilityCooldown/120),10);
+ ctx.fillText("Ability",20,140);
+ ctx.fillStyle=abilityCooldown>0?"red":"lime";
+ ctx.fillRect(20,150,100*(1-abilityCooldown/120),10);
 }
 
 // ---------- GAME OVER ----------
 function drawGameOver(){
-  totalCoins += player.coins;
+ totalCoins+=player.coins;
 
-  ctx.fillStyle="#1e1e2f";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.fillStyle="#1e1e2f";
+ ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  ctx.fillStyle="red";
-  ctx.font="50px 'Press Start 2P'";
-  ctx.textAlign="center";
-  ctx.fillText("YOU DIED", canvas.width/2, canvas.height/2-40);
+ ctx.fillStyle="red";
+ ctx.font="40px 'Press Start 2P'";
+ ctx.textAlign="center";
+ ctx.fillText("YOU DIED",canvas.width/2,canvas.height/2-40);
 
-  ctx.fillStyle="white";
-  ctx.font="20px 'Press Start 2P'";
-  ctx.fillText("Coins: "+player.coins, canvas.width/2, canvas.height/2+20);
-  ctx.fillText("Press ENTER", canvas.width/2, canvas.height/2+80);
+ ctx.fillStyle="white";
+ ctx.fillText("Coins:"+player.coins,canvas.width/2,canvas.height/2+20);
+ ctx.fillText("ENTER TO RESTART",canvas.width/2,canvas.height/2+80);
 }
 
 // ---------- START ----------
 function startGame(){
-  let char = characters[selectedCharacter];
-  player = createPlayer(char);
-  titans=[];
-  wave=1;
-  spawnWave();
-  gameState="playing";
+ player=createPlayer(characters[selectedCharacter]);
+ titans=[];wave=1;spawnWave();
+ gameState="playing";
 }
 
 // ---------- LOOP ----------
 function gameLoop(){
-  if(gameState==="loading") drawLoading();
-  else if(gameState==="menu") drawMenu();
-  else if(gameState==="playing"){ update(); draw(); }
-  else if(gameState==="gameover") drawGameOver();
+ if(gameState==="loading") drawLoading();
+ else if(gameState==="menu") drawMenu();
+ else if(gameState==="playing"){update();draw();}
+ else if(gameState==="gameover") drawGameOver();
 
-  requestAnimationFrame(gameLoop);
+ requestAnimationFrame(gameLoop);
 }
 
 gameLoop();
 </script>
-
 </body>
 </html>
