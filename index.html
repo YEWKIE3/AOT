@@ -4,171 +4,143 @@
   <title>AOT Survival</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-    body{margin:0;overflow:hidden;background:#1e1e2f;font-family:'Press Start 2P',monospace;}
-    canvas{display:block;}
+
+    body { margin:0; overflow:hidden; background:#1e1e2f; }
+    canvas { display:block; }
   </style>
 </head>
 <body>
+
 <canvas id="game"></canvas>
 
 <script>
-const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
-canvas.width=window.innerWidth;
-canvas.height=window.innerHeight;
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// ---------- SPRITE ----------
+let spriteSheet = new Image();
+spriteSheet.src = "sprites.png";
+
+const SPRITE_SIZE = 64;
+
+// map characters to sprite positions
+let spriteMap = {
+  "Eren": {row:0},
+  "Mikasa": {row:1},
+  "Armin": {row:2},
+  "Levi": {row:3},
+  "Reiner": {row:4},
+  "Annie": {row:5}
+};
 
 // ---------- STATE ----------
-let gameState="loading";
-let loadingTimer=0;
+let gameState = "loading";
+let loadingTimer = 0;
 
 // ---------- LOADING ----------
 function drawLoading(){
   ctx.fillStyle="#1e1e2f";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  let progress=loadingTimer/120;
-
   ctx.fillStyle="white";
-  ctx.font="50px 'Press Start 2P'";
+  ctx.font="40px Arial";
   ctx.textAlign="center";
-  ctx.fillText("LOADING...",canvas.width/2,canvas.height/2-40);
-
-  ctx.fillStyle="gray";
-  ctx.fillRect(canvas.width/2-150,canvas.height/2,300,20);
-
-  ctx.fillStyle="lime";
-  ctx.fillRect(canvas.width/2-150,canvas.height/2,300*progress,20);
+  ctx.fillText("LOADING...", canvas.width/2, canvas.height/2);
 
   loadingTimer++;
-  if(loadingTimer>120) gameState="menu";
+  if(loadingTimer > 60) gameState = "menu";
 }
-
-// ---------- GLOBAL COINS ----------
-let totalCoins=0;
 
 // ---------- CHARACTERS ----------
-let characters=[
- {name:"Eren",speed:5,health:3,range:40,ability:"rage",rarity:"common",unlocked:true,color:"green"},
- {name:"Mikasa",speed:8,health:2,range:30,ability:"dash",rarity:"rare",unlocked:false,cost:10,color:"red"},
- {name:"Armin",speed:4,health:3,range:50,ability:"mark",rarity:"rare",unlocked:false,cost:12,color:"yellow"},
- {name:"Levi",speed:7,health:2,range:70,ability:"spin",rarity:"epic",unlocked:false,cost:20,color:"purple"},
- {name:"Reiner",speed:3,health:5,range:50,ability:"armor",rarity:"rare",unlocked:false,cost:15,color:"brown"},
- {name:"Annie",speed:5,health:3,range:45,ability:"counter",rarity:"epic",unlocked:false,cost:18,color:"pink"}
+let totalCoins = 0;
+
+let characters = [
+ {name:"Eren",speed:5,health:3,range:40,ability:"rage",rarity:"common",unlocked:true},
+ {name:"Mikasa",speed:8,health:2,range:30,ability:"dash",rarity:"rare",unlocked:true},
+ {name:"Armin",speed:4,health:3,range:50,ability:"mark",rarity:"rare",unlocked:true},
+ {name:"Levi",speed:7,health:2,range:70,ability:"spin",rarity:"epic",unlocked:true},
+ {name:"Reiner",speed:3,health:5,range:50,ability:"armor",rarity:"rare",unlocked:true},
+ {name:"Annie",speed:5,health:3,range:45,ability:"counter",rarity:"epic",unlocked:true}
 ];
 
-function getRarityColor(r){
- if(r==="common") return "white";
- if(r==="rare") return "blue";
- if(r==="epic") return "purple";
-}
-
 // ---------- MENU ----------
-let selectedCharacter=0;
+let selectedCharacter = 0;
 
 function drawMenu(){
- ctx.fillStyle="#1e1e2f";
- ctx.fillRect(0,0,canvas.width,canvas.height);
-
- ctx.fillStyle="white";
- ctx.font="30px 'Press Start 2P'";
- ctx.textAlign="center";
- ctx.fillText("SELECT CHARACTER",canvas.width/2,80);
-
- let startX=canvas.width/2-(characters.length*120)/2;
-
- characters.forEach((c,i)=>{
-  let x=startX+i*120;
-  let y=canvas.height/2;
-
-  ctx.fillStyle=getRarityColor(c.rarity);
-  ctx.fillRect(x-40,y-40,80,80);
-
-  ctx.fillStyle=c.color;
-  ctx.fillRect(x-20,y-20,40,40);
-
-  if(!c.unlocked){
-   ctx.fillStyle="rgba(0,0,0,0.6)";
-   ctx.fillRect(x-40,y-40,80,80);
-   ctx.fillStyle="red";
-   ctx.font="10px 'Press Start 2P'";
-   ctx.fillText(c.cost+"C",x,y);
-  }
-
-  if(i===selectedCharacter){
-   ctx.strokeStyle="yellow";
-   ctx.lineWidth=3;
-   ctx.strokeRect(x-40,y-40,80,80);
-  }
+  ctx.fillStyle="#1e1e2f";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
   ctx.fillStyle="white";
-  ctx.font="10px 'Press Start 2P'";
-  ctx.fillText(c.name,x,y+60);
- });
+  ctx.font="30px Arial";
+  ctx.textAlign="center";
+  ctx.fillText("SELECT CHARACTER", canvas.width/2, 80);
 
- ctx.fillStyle="gold";
- ctx.fillText("Coins: "+totalCoins,canvas.width/2,canvas.height-100);
- ctx.fillText("ENTER = PLAY / BUY",canvas.width/2,canvas.height-60);
+  let startX = canvas.width/2 - (characters.length * 100)/2;
+
+  characters.forEach((c,i)=>{
+    let x = startX + i*100;
+    let y = canvas.height/2;
+
+    ctx.fillStyle = i===selectedCharacter ? "yellow" : "gray";
+    ctx.fillRect(x-40,y-40,80,80);
+
+    ctx.fillStyle="black";
+    ctx.fillText(c.name,x,y+60);
+  });
 }
 
 // ---------- PLAYER ----------
 let player;
 
 function createPlayer(c){
- return{
-  x:canvas.width/2,
-  y:canvas.height/2,
-  width:30,height:30,
-  speed:c.speed,
-  health:c.health,
-  maxHealth:c.health,
-  coins:0,
-  range:c.range,
-  ability:c.ability,
-  color:c.color
- };
-}
+  return {
+    name:c.name,
+    x:canvas.width/2,
+    y:canvas.height/2,
+    speed:c.speed,
+    health:c.health,
+    maxHealth:c.health,
+    range:c.range,
+    ability:c.ability,
+    coins:0,
 
-// ---------- TITANS ----------
-let titans=[];
-let wave=1;
-
-function spawnWave(){
- for(let i=0;i<wave+3;i++){
-  titans.push({
-   x:Math.random()*canvas.width,
-   y:Math.random()*canvas.height,
-   width:60,height:100,
-   speed:1+Math.random(),
-   health:2
-  });
- }
+    // animation
+    frame:0,
+    frameTimer:0,
+    state:"idle",
+    facing:1
+  };
 }
 
 // ---------- CONTROLS ----------
 let keys={};
 document.addEventListener("keydown",e=>{
- keys[e.key]=true;
+  keys[e.key]=true;
 
- if(gameState==="menu"){
-  if(e.key==="ArrowLeft") selectedCharacter=(selectedCharacter-1+characters.length)%characters.length;
-  if(e.key==="ArrowRight") selectedCharacter=(selectedCharacter+1)%characters.length;
+  if(gameState==="menu"){
+    if(e.key==="ArrowLeft") selectedCharacter--;
+    if(e.key==="ArrowRight") selectedCharacter++;
+    if(e.key==="Enter") startGame();
 
-  if(e.key==="Enter"){
-   let c=characters[selectedCharacter];
-   if(c.unlocked) startGame();
-   else if(totalCoins>=c.cost){totalCoins-=c.cost;c.unlocked=true;}
+    if(selectedCharacter<0) selectedCharacter=characters.length-1;
+    if(selectedCharacter>=characters.length) selectedCharacter=0;
   }
- }
 
- if(gameState==="playing" && e.key===" "){attacking=true;attackTimer=10;}
+  if(gameState==="playing" && e.key===" "){
+    attacking=true;
+    attackTimer=10;
+  }
 
- if(gameState==="playing" && e.key==="e" && abilityCooldown<=0){
-  useAbility();
-  abilityCooldown=120;
- }
+  if(gameState==="playing" && e.key==="e" && abilityCooldown<=0){
+    useAbility();
+    abilityCooldown=120;
+  }
 
- if(gameState==="gameover" && e.key==="Enter") startGame();
+  if(gameState==="gameover" && e.key==="Enter") startGame();
 });
+
 document.addEventListener("keyup",e=>keys[e.key]=false);
 
 // ---------- ABILITIES ----------
@@ -176,152 +148,174 @@ let abilityCooldown=0;
 
 function useAbility(){
  if(player.ability==="dash"){
-  if(keys["d"]) player.x+=120;
-  if(keys["a"]) player.x-=120;
-  if(keys["w"]) player.y-=120;
-  if(keys["s"]) player.y+=120;
+  player.x += player.facing * 120;
  }
-
  if(player.ability==="spin"){
-  titans.forEach((t,i)=>{
-   let dx=player.x-t.x,dy=player.y-t.y;
-   if(Math.sqrt(dx*dx+dy*dy)<player.range+50){
-    titans.splice(i,1);
-    player.coins++;
-   }
-  });
+  titans = [];
  }
-
  if(player.ability==="rage"){
-  player.speed*=1.5;
+  player.speed *= 1.5;
   setTimeout(()=>player.speed/=1.5,3000);
  }
-
  if(player.ability==="armor"){
-  player.health+=2;
+  player.health += 2;
  }
-
  if(player.ability==="counter"){
-  titans=[];
+  titans = [];
  }
-
  if(player.ability==="mark"){
   titans.forEach(t=>t.health=1);
  }
+}
+
+// ---------- TITANS ----------
+let titans=[];
+let wave=1;
+
+function spawnWave(){
+  for(let i=0;i<wave+3;i++){
+    titans.push({
+      x:Math.random()*canvas.width,
+      y:Math.random()*canvas.height,
+      speed:1+Math.random(),
+      health:2
+    });
+  }
 }
 
 // ---------- ATTACK ----------
 let attacking=false,attackTimer=0;
 
 function attack(){
- titans.forEach((t,i)=>{
-  let dx=player.x-t.x,dy=player.y-t.y;
-  if(Math.sqrt(dx*dx+dy*dy)<player.range){
-   t.health--;
-   if(t.health<=0){titans.splice(i,1);player.coins++;}
-  }
- });
+  titans.forEach((t,i)=>{
+    let dx=player.x-t.x,dy=player.y-t.y;
+    if(Math.sqrt(dx*dx+dy*dy)<player.range){
+      titans.splice(i,1);
+      player.coins++;
+    }
+  });
 }
 
 // ---------- UPDATE ----------
 function update(){
- if(keys["w"]) player.y-=player.speed;
- if(keys["s"]) player.y+=player.speed;
- if(keys["a"]) player.x-=player.speed;
- if(keys["d"]) player.x+=player.speed;
+  let moving = false;
 
- titans.forEach(t=>{
-  let dx=player.x-t.x,dy=player.y-t.y;
-  let dist=Math.sqrt(dx*dx+dy*dy);
-  t.x+=(dx/dist)*t.speed;
-  t.y+=(dy/dist)*t.speed;
+  if(keys["w"]){ player.y-=player.speed; moving=true; }
+  if(keys["s"]){ player.y+=player.speed; moving=true; }
+  if(keys["a"]){ player.x-=player.speed; player.facing=-1; moving=true; }
+  if(keys["d"]){ player.x+=player.speed; player.facing=1; moving=true; }
 
-  if(dist<40){
-   player.health--;
-   t.x=Math.random()*canvas.width;
-   t.y=Math.random()*canvas.height;
-   if(player.health<=0) gameState="gameover";
+  player.state = moving ? "walk" : "idle";
+  if(attacking) player.state="attack";
+
+  // animation
+  player.frameTimer++;
+  if(player.frameTimer>8){
+    player.frame++;
+    player.frameTimer=0;
   }
- });
+  if(player.frame>3) player.frame=0;
 
- if(attacking){
-  attackTimer--;
-  attack();
-  if(attackTimer<=0) attacking=false;
- }
+  titans.forEach(t=>{
+    let dx=player.x-t.x,dy=player.y-t.y;
+    let dist=Math.sqrt(dx*dx+dy*dy);
 
- if(abilityCooldown>0) abilityCooldown--;
+    t.x += (dx/dist)*t.speed;
+    t.y += (dy/dist)*t.speed;
 
- if(titans.length===0){wave++;spawnWave();}
+    if(dist<40){
+      player.health--;
+      t.x=Math.random()*canvas.width;
+      t.y=Math.random()*canvas.height;
+      if(player.health<=0) gameState="gameover";
+    }
+  });
+
+  if(attacking){
+    attackTimer--;
+    attack();
+    if(attackTimer<=0) attacking=false;
+  }
+
+  if(abilityCooldown>0) abilityCooldown--;
+
+  if(titans.length===0){ wave++; spawnWave(); }
+}
+
+// ---------- DRAW PLAYER ----------
+function drawPlayer(){
+  let sprite = spriteMap[player.name];
+
+  let frameX = player.frame * SPRITE_SIZE;
+  let frameY = sprite.row * SPRITE_SIZE;
+
+  ctx.save();
+
+  if(player.facing === -1){
+    ctx.scale(-1,1);
+    ctx.drawImage(spriteSheet, frameX, frameY, SPRITE_SIZE, SPRITE_SIZE,
+      -player.x-64, player.y, 64,64);
+  } else {
+    ctx.drawImage(spriteSheet, frameX, frameY, SPRITE_SIZE, SPRITE_SIZE,
+      player.x, player.y, 64,64);
+  }
+
+  ctx.restore();
 }
 
 // ---------- DRAW ----------
 function draw(){
- ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
- let pulse=Math.sin(Date.now()*0.01)*2;
- ctx.fillStyle=player.color;
- ctx.fillRect(player.x,player.y+pulse,30,30);
+  drawPlayer();
 
- titans.forEach(t=>{
-  ctx.fillStyle="red";
-  ctx.fillRect(t.x,t.y,t.width,t.height);
- });
+  titans.forEach(t=>{
+    ctx.fillStyle="red";
+    ctx.fillRect(t.x,t.y,40,60);
+  });
 
- if(attacking){
-  ctx.strokeStyle="white";
-  ctx.beginPath();
-  ctx.arc(player.x+15,player.y+15,player.range,0,Math.PI*2);
-  ctx.stroke();
- }
-
- // HUD
- ctx.fillStyle="gray";ctx.fillRect(20,20,150,20);
- ctx.fillStyle="lime";ctx.fillRect(20,20,(player.health/player.maxHealth)*150,20);
-
- ctx.fillStyle="gold";ctx.fillText("Coins:"+player.coins,20,70);
- ctx.fillStyle="white";ctx.fillText("Wave:"+wave,20,100);
-
- ctx.fillText("Ability",20,140);
- ctx.fillStyle=abilityCooldown>0?"red":"lime";
- ctx.fillRect(20,150,100*(1-abilityCooldown/120),10);
+  // HUD
+  ctx.fillStyle="white";
+  ctx.fillText("HP:"+player.health,20,20);
+  ctx.fillText("Coins:"+player.coins,20,40);
 }
 
 // ---------- GAME OVER ----------
 function drawGameOver(){
- totalCoins+=player.coins;
+  totalCoins += player.coins;
 
- ctx.fillStyle="#1e1e2f";
- ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="black";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
- ctx.fillStyle="red";
- ctx.font="40px 'Press Start 2P'";
- ctx.textAlign="center";
- ctx.fillText("YOU DIED",canvas.width/2,canvas.height/2-40);
+  ctx.fillStyle="red";
+  ctx.font="40px Arial";
+  ctx.textAlign="center";
+  ctx.fillText("GAME OVER",canvas.width/2,canvas.height/2);
 
- ctx.fillStyle="white";
- ctx.fillText("Coins:"+player.coins,canvas.width/2,canvas.height/2+20);
- ctx.fillText("ENTER TO RESTART",canvas.width/2,canvas.height/2+80);
+  ctx.fillText("Press Enter",canvas.width/2,canvas.height/2+60);
 }
 
 // ---------- START ----------
 function startGame(){
- player=createPlayer(characters[selectedCharacter]);
- titans=[];wave=1;spawnWave();
- gameState="playing";
+  player=createPlayer(characters[selectedCharacter]);
+  titans=[];
+  wave=1;
+  spawnWave();
+  gameState="playing";
 }
 
 // ---------- LOOP ----------
 function gameLoop(){
- if(gameState==="loading") drawLoading();
- else if(gameState==="menu") drawMenu();
- else if(gameState==="playing"){update();draw();}
- else if(gameState==="gameover") drawGameOver();
+  if(gameState==="loading") drawLoading();
+  else if(gameState==="menu") drawMenu();
+  else if(gameState==="playing"){ update(); draw(); }
+  else if(gameState==="gameover") drawGameOver();
 
- requestAnimationFrame(gameLoop);
+  requestAnimationFrame(gameLoop);
 }
 
 gameLoop();
 </script>
+
 </body>
 </html>
