@@ -1,16 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>AOT Survival</title>
-  <style>
-    body { margin:0; overflow:hidden; background:#1e1e2f; }
-    canvas { display:block; }
-  </style>
-</head>
-<body>
-
-<canvas id="game"></canvas>
-
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -20,22 +7,16 @@ canvas.height = window.innerHeight;
 // ---------- IMAGE ----------
 let sprite = new Image();
 let loaded = false;
-
 sprite.onload = () => loaded = true;
 sprite.src = "./sprites.png";
 
-// ---------- GRID SETTINGS ----------
+// ---------- GRID ----------
 const COLS = 3;
 const ROWS = 2;
-
 let frameWidth, frameHeight;
 
 // ---------- CHARACTERS ----------
-let characters = [
- "Eren","Mikasa","Armin",
- "Levi","Reiner","Annie"
-];
-
+let characters = ["Eren","Mikasa","Armin","Levi","Reiner","Annie"];
 let selectedCharacter = 0;
 
 // ---------- STATE ----------
@@ -63,6 +44,11 @@ document.addEventListener("keydown",e=>{
     if(e.key==="Enter") startGame();
   }
 
+  if(gameState==="playing" && e.key===" "){
+    player.attacking = true;
+    player.attackTimer = 10;
+  }
+
   if(gameState==="gameover" && e.key==="Enter"){
     gameState="menu";
   }
@@ -76,12 +62,16 @@ function startGame(){
     x:canvas.width/2,
     y:canvas.height/2,
     health:3,
-    index:selectedCharacter
+    index:selectedCharacter,
+    facing:1,
+    frame:0,
+    frameTick:0,
+    attacking:false,
+    attackTimer:0
   };
 
   titans=[];
   spawnWave();
-
   gameState="playing";
 }
 
@@ -98,11 +88,44 @@ function spawnWave(){
 
 // ---------- UPDATE ----------
 function update(){
-  if(keys["w"]) player.y-=5;
-  if(keys["s"]) player.y+=5;
-  if(keys["a"]) player.x-=5;
-  if(keys["d"]) player.x+=5;
+  let moving = false;
 
+  if(keys["w"]){ player.y-=5; moving=true; }
+  if(keys["s"]){ player.y+=5; moving=true; }
+  if(keys["a"]){ player.x-=5; player.facing=-1; moving=true; }
+  if(keys["d"]){ player.x+=5; player.facing=1; moving=true; }
+
+  // walking animation
+  if(moving){
+    player.frameTick++;
+    if(player.frameTick > 8){
+      player.frame = (player.frame+1)%2;
+      player.frameTick = 0;
+    }
+  } else {
+    player.frame = 0;
+  }
+
+  // attack logic
+  if(player.attacking){
+    player.attackTimer--;
+
+    titans.forEach((t,i)=>{
+      let dx=player.x-t.x;
+      let dy=player.y-t.y;
+      let dist=Math.sqrt(dx*dx+dy*dy);
+
+      if(dist < 80){
+        titans.splice(i,1);
+      }
+    });
+
+    if(player.attackTimer <= 0){
+      player.attacking = false;
+    }
+  }
+
+  // titan movement
   titans.forEach((t,i)=>{
     let dx=player.x-t.x;
     let dy=player.y-t.y;
@@ -124,15 +147,57 @@ function update(){
   if(titans.length===0) spawnWave();
 }
 
-// ---------- GET SPRITE POSITION ----------
+// ---------- SPRITE POS ----------
 function getSpritePos(index){
   let col = index % COLS;
   let row = Math.floor(index / COLS);
-
   return {
     sx: col * frameWidth,
     sy: row * frameHeight
   };
+}
+
+// ---------- DRAW PLAYER ----------
+function drawPlayer(){
+  let pos = getSpritePos(player.index);
+
+  ctx.save();
+
+  // flip
+  if(player.facing === -1){
+    ctx.scale(-1,1);
+    ctx.drawImage(
+      sprite,
+      pos.sx, pos.sy,
+      frameWidth, frameHeight,
+      -player.x-64, player.y + player.frame*2, // bounce
+      64, 64
+    );
+  } else {
+    ctx.drawImage(
+      sprite,
+      pos.sx, pos.sy,
+      frameWidth, frameHeight,
+      player.x, player.y + player.frame*2,
+      64, 64
+    );
+  }
+
+  ctx.restore();
+
+  // 🔥 blade swing animation
+  if(player.attacking){
+    ctx.save();
+    ctx.translate(player.x+32, player.y+32);
+
+    let angle = (10 - player.attackTimer) * 0.3 * player.facing;
+    ctx.rotate(angle);
+
+    ctx.fillStyle="white";
+    ctx.fillRect(0, -5, 50, 10);
+
+    ctx.restore();
+  }
 }
 
 // ---------- MENU ----------
@@ -165,19 +230,6 @@ function drawMenu(){
     ctx.fillStyle="white";
     ctx.fillText(name,x,y+60);
   });
-}
-
-// ---------- DRAW PLAYER ----------
-function drawPlayer(){
-  let pos = getSpritePos(player.index);
-
-  ctx.drawImage(
-    sprite,
-    pos.sx, pos.sy,
-    frameWidth, frameHeight,
-    player.x, player.y,
-    64, 64
-  );
 }
 
 // ---------- DRAW ----------
@@ -224,6 +276,3 @@ function gameLoop(){
 
 gameLoop();
 </script>
-
-</body>
-</html>
