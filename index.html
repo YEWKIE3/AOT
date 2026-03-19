@@ -1,14 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AOT Survival</title>
+  <title>AOT Survival: Ultimate</title>
   <style>
-    body { margin:0; overflow:hidden; background:black; }
-    canvas { display:block; }
+    body { margin:0; overflow:hidden; background:#111; }
+    canvas { display:block; background:#111; }
+    #scoreboard {
+      position:absolute; top:10px; left:10px; color:white; font-family:sans-serif; font-size:20px;
+    }
   </style>
 </head>
 <body>
 
+<div id="scoreboard">HP: 3 | Score: 0 | Wave: 1</div>
 <canvas id="game"></canvas>
 
 <script>
@@ -17,307 +21,155 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-ctx.font = "20px Arial";
-ctx.textAlign = "center";
-
-// ---------- IMAGE ----------
 let sprite = new Image();
 let spriteReady = false;
-let frameWidth = 0;
-let frameHeight = 0;
-
-sprite.onload = () => {
-  spriteReady = true;
-  frameWidth = sprite.width / 3;
-  frameHeight = sprite.height / 2;
-  gameState = "menu";
-};
-
+let frameWidth = 0, frameHeight = 0;
 sprite.src = "./sprites.png";
+sprite.onload = () => { spriteReady = true; frameWidth = sprite.width/3; frameHeight = sprite.height/2; gameState="menu"; };
 
-// ---------- STATE ----------
 let gameState = "loading";
-
-// ---------- CHARACTERS ----------
 let characters = ["Eren","Mikasa","Armin","Levi","Reiner","Annie"];
 let selectedCharacter = 0;
-
-// ---------- PLAYER ----------
 let player = null;
-
-// ---------- TITANS ----------
 let titans = [];
-
-// ---------- INPUT ----------
+let score = 0, wave = 1;
 let keys = {};
 
-document.addEventListener("keydown", e=>{
+document.addEventListener("keydown", e => {
   keys[e.key] = true;
-
   if(gameState==="menu"){
-    if(e.key==="ArrowLeft") selectedCharacter--;
-    if(e.key==="ArrowRight") selectedCharacter++;
-
-    if(selectedCharacter<0) selectedCharacter=characters.length-1;
-    if(selectedCharacter>=characters.length) selectedCharacter=0;
-
+    if(e.key==="ArrowLeft") selectedCharacter = (selectedCharacter-1+characters.length)%characters.length;
+    if(e.key==="ArrowRight") selectedCharacter = (selectedCharacter+1)%characters.length;
     if(e.key==="Enter") startGame();
   }
-
-  if(gameState==="playing" && e.key===" "){
-    if(player){
-      player.attacking = true;
-      player.attackTimer = 10;
-    }
+  if(gameState==="playing"){
+    if(e.key===" ") attack();
+    if(e.key==="Shift") dash();
   }
-
-  if(gameState==="playing" && e.key==="Shift"){
-    player.dashing = true;
-    player.dashTimer = 10;
-  }
-
-  if(gameState==="gameover" && e.key==="Enter"){
-    gameState="menu";
-  }
+  if(gameState==="gameover" && e.key==="Enter") { gameState="menu"; score=0; wave=1; }
 });
-
 document.addEventListener("keyup", e=> keys[e.key]=false);
 
-// ---------- START ----------
+// --- GAME START ---
 function startGame(){
-  player = {
-    x:canvas.width/2,
-    y:canvas.height/2,
-    health:3,
-    index:selectedCharacter,
-
-    attacking:false,
-    attackTimer:0,
-
-    dashing:false,
-    dashTimer:0
-  };
-
+  player = { x:canvas.width/2, y:canvas.height/2, health:3, index:selectedCharacter, attacking:false, attackTimer:0, dashing:false, dashTimer:0 };
   titans = [];
   spawnWave();
   gameState="playing";
 }
 
-// ---------- SPAWN ----------
+// --- SPAWN TITANS ---
 function spawnWave(){
-  for(let i=0;i<5;i++){
+  wave++;
+  for(let i=0;i<3+wave;i++){
     titans.push({
       x:Math.random()*canvas.width,
       y:Math.random()*canvas.height,
-      speed:1+Math.random()
+      speed:1+Math.random()*wave*0.3,
+      size:30+Math.random()*30
     });
   }
 }
 
-// ---------- UPDATE ----------
+// --- PLAYER ACTIONS ---
+function attack(){ if(player){ player.attacking=true; player.attackTimer=10; } }
+function dash(){ if(player){ player.dashing=true; player.dashTimer=10; } }
+
+// --- UPDATE GAME ---
 function update(){
   if(!player) return;
-
-  let speed = player.dashing ? 10 : 5;
-
+  let speed = player.dashing?10:5;
   if(keys["w"]) player.y-=speed;
   if(keys["s"]) player.y+=speed;
   if(keys["a"]) player.x-=speed;
   if(keys["d"]) player.x+=speed;
 
-  // dash timer
-  if(player.dashing){
-    player.dashTimer--;
-    if(player.dashTimer<=0) player.dashing=false;
-  }
-
-  // attack
+  if(player.dashing){ player.dashTimer--; if(player.dashTimer<=0) player.dashing=false; }
   if(player.attacking){
     player.attackTimer--;
-
     for(let i=titans.length-1;i>=0;i--){
       let t = titans[i];
-      let dx=player.x-t.x;
-      let dy=player.y-t.y;
-      let dist=Math.sqrt(dx*dx+dy*dy);
-
-      if(dist<80) titans.splice(i,1);
+      let dx=player.x-t.x, dy=player.y-t.y, dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<t.size+40){ titans.splice(i,1); score+=10; }
     }
-
     if(player.attackTimer<=0) player.attacking=false;
   }
 
-  // titan movement
-  for(let i=titans.length-1;i>=0;i--){
-    let t = titans[i];
-    let dx=player.x-t.x;
-    let dy=player.y-t.y;
-    let dist=Math.sqrt(dx*dx+dy*dy);
-
+  for(let t of titans){
+    let dx=player.x-t.x, dy=player.y-t.y, dist=Math.sqrt(dx*dx+dy*dy);
     t.x += (dx/dist)*t.speed;
     t.y += (dy/dist)*t.speed;
-
-    if(dist<40){
-      player.health--;
-      titans.splice(i,1);
-
-      if(player.health<=0){
-        gameState="gameover";
-      }
-    }
+    if(dist<t.size+20){ player.health--; titans.splice(titans.indexOf(t),1); if(player.health<=0) gameState="gameover"; }
   }
 
   if(titans.length===0) spawnWave();
+  document.getElementById("scoreboard").innerText = `HP: ${player.health} | Score: ${score} | Wave: ${wave}`;
 }
 
-// ---------- SPRITE ----------
-function getSprite(index){
-  let col = index % 3;
-  let row = Math.floor(index / 3);
-  return {
-    sx: col * frameWidth,
-    sy: row * frameHeight
-  };
-}
+// --- SPRITE POS ---
+function getSprite(index){ let col=index%3, row=Math.floor(index/3); return { sx:col*frameWidth, sy:row*frameHeight }; }
 
-// ---------- DRAW PLAYER ----------
+// --- DRAW PLAYER ---
 function drawPlayer(){
   if(!player || !spriteReady) return;
-
   let pos = getSprite(player.index);
-
   ctx.save();
-
-  ctx.translate(player.x + 32, player.y + 32);
-
-  // 🔥 rotation instead of flip
-  let angle = 0;
-
-  if(player.dashing && player.attacking){
-    angle = (10 - player.attackTimer) * 0.8; // spin
-  }
-  else if(keys["a"]) angle = -0.15;
-  else if(keys["d"]) angle = 0.15;
-
+  ctx.translate(player.x, player.y);
+  let angle=0;
+  if(player.dashing && player.attacking) angle=(10-player.attackTimer)*0.8;
+  else if(keys["a"]) angle=-0.15;
+  else if(keys["d"]) angle=0.15;
   ctx.rotate(angle);
-
-  ctx.drawImage(
-    sprite,
-    pos.sx, pos.sy,
-    frameWidth, frameHeight,
-    -32, -32,
-    64, 64
-  );
-
+  ctx.drawImage(sprite,pos.sx,pos.sy,frameWidth,frameHeight,-32,-32,64,64);
   ctx.restore();
 
-  // 🔥 attack + trail
+  // Attack particle
   if(player.attacking){
-    ctx.save();
-    ctx.translate(player.x+32, player.y+32);
-
-    let swing = (10 - player.attackTimer) * 0.6;
-    ctx.rotate(swing);
-
-    ctx.fillStyle="white";
-    ctx.fillRect(0,-4,55,8);
-
-    ctx.globalAlpha = 0.3;
-    ctx.fillStyle="cyan";
-    ctx.fillRect(-10,-6,70,12);
-
-    ctx.restore();
+    ctx.save(); ctx.translate(player.x,player.y);
+    let swing=(10-player.attackTimer)*0.6; ctx.rotate(swing);
+    ctx.fillStyle="white"; ctx.fillRect(0,-4,55,8);
+    ctx.globalAlpha=0.3; ctx.fillStyle="cyan"; ctx.fillRect(-10,-6,70,12);
+    ctx.globalAlpha=1; ctx.restore();
   }
 }
 
-// ---------- MENU ----------
+// --- DRAW TITANS ---
+function drawTitans(){ for(let t of titans){ ctx.fillStyle="red"; ctx.beginPath(); ctx.ellipse(t.x,t.y,t.size/2,t.size,0,0,2*Math.PI); ctx.fill(); } }
+
+// --- DRAW DASH EFFECT ---
+function drawDash(){ if(player && player.dashing){ ctx.strokeStyle="white"; for(let i=0;i<5;i++){ ctx.beginPath(); ctx.moveTo(player.x,player.y); ctx.lineTo(player.x+Math.random()*100-50, player.y+Math.random()*100-50); ctx.stroke(); } } }
+
+// --- DRAW MENU ---
 function drawMenu(){
-  ctx.fillStyle="black";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  ctx.fillStyle="white";
-  ctx.fillText("SELECT CHARACTER", canvas.width/2,100);
-
-  let startX = canvas.width/2 - (characters.length * 100)/2;
-
+  ctx.fillStyle="#111"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="white"; ctx.textAlign="center"; ctx.fillText("SELECT CHARACTER",canvas.width/2,100);
+  let startX = canvas.width/2 - (characters.length*100)/2;
   for(let i=0;i<characters.length;i++){
-    let x=startX+i*100;
-    let y=canvas.height/2;
-
-    if(spriteReady){
-      let pos=getSprite(i);
-      ctx.drawImage(sprite,pos.sx,pos.sy,frameWidth,frameHeight,x-32,y-32,64,64);
-    }
-
-    if(i===selectedCharacter){
-      ctx.strokeStyle="yellow";
-      ctx.strokeRect(x-40,y-40,80,80);
-    }
-
-    ctx.fillStyle="white";
-    ctx.fillText(characters[i],x,y+60);
+    let x=startX+i*100, y=canvas.height/2;
+    if(spriteReady){ let pos=getSprite(i); ctx.drawImage(sprite,pos.sx,pos.sy,frameWidth,frameHeight,x-32,y-32,64,64); }
+    if(i===selectedCharacter){ ctx.strokeStyle="yellow"; ctx.strokeRect(x-40,y-40,80,80); }
+    ctx.fillStyle="white"; ctx.fillText(characters[i],x,y+60);
   }
 }
 
-// ---------- DRAW ----------
+// --- DRAW GAME ---
 function draw(){
-  ctx.fillStyle="black";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  drawPlayer();
-
-  // titans
-  ctx.fillStyle="red";
-  for(let t of titans){
-    ctx.fillRect(t.x,t.y,40,60);
-  }
-
-  // 🔥 speed lines
-  if(player && player.dashing){
-    ctx.strokeStyle="white";
-    for(let i=0;i<5;i++){
-      ctx.beginPath();
-      ctx.moveTo(player.x+32, player.y+32);
-      ctx.lineTo(
-        player.x + Math.random()*100 - 50,
-        player.y + Math.random()*100 - 50
-      );
-      ctx.stroke();
-    }
-  }
-
-  if(player){
-    ctx.fillStyle="white";
-    ctx.fillText("HP: "+player.health,60,30);
-  }
+  ctx.fillStyle="#111"; ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawPlayer(); drawTitans(); drawDash();
 }
 
-// ---------- GAME OVER ----------
-function drawGameOver(){
-  ctx.fillStyle="black";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+// --- DRAW GAME OVER ---
+function drawGameOver(){ ctx.fillStyle="#111"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="red"; ctx.textAlign="center"; ctx.fillText("GAME OVER",canvas.width/2,canvas.height/2); }
 
-  ctx.fillStyle="red";
-  ctx.fillText("GAME OVER",canvas.width/2,canvas.height/2);
-}
-
-// ---------- LOOP ----------
+// --- LOOP ---
 function loop(){
-  if(gameState==="loading"){
-    ctx.fillStyle="black";
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle="white";
-    ctx.fillText("LOADING...",canvas.width/2,canvas.height/2);
-  }
+  if(gameState==="loading"){ ctx.fillStyle="#111"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="white"; ctx.textAlign="center"; ctx.fillText("LOADING...",canvas.width/2,canvas.height/2); }
   else if(gameState==="menu") drawMenu();
   else if(gameState==="playing"){ update(); draw(); }
   else if(gameState==="gameover") drawGameOver();
-
   requestAnimationFrame(loop);
 }
-
 loop();
 </script>
-
 </body>
 </html>
