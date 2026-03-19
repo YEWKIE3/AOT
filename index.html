@@ -1,50 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AOT Survival</title>
+  <style>
+    body { margin:0; overflow:hidden; background:black; }
+    canvas { display:block; }
+  </style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// ---------- SAFE FONT ----------
 ctx.font = "20px Arial";
 ctx.textAlign = "center";
 
+// ---------- STATE ----------
+let gameState = "loading";
+
 // ---------- IMAGE ----------
 let sprite = new Image();
-let loaded = false;
+let spriteReady = false;
+let frameWidth = 0;
+let frameHeight = 0;
 
 sprite.onload = () => {
-  loaded = true;
+  spriteReady = true;
   frameWidth = sprite.width / 3;
   frameHeight = sprite.height / 2;
   gameState = "menu";
 };
 
 sprite.onerror = () => {
-  console.log("IMAGE FAILED");
+  console.log("IMAGE FAILED TO LOAD");
 };
 
 sprite.src = "./sprites.png";
 
-// ---------- GRID ----------
-let frameWidth = 64;
-let frameHeight = 64;
-
-// ---------- STATE ----------
-let gameState = "loading";
-
-// ---------- CHARACTERS ----------
+// ---------- DATA ----------
 let characters = ["Eren","Mikasa","Armin","Levi","Reiner","Annie"];
 let selectedCharacter = 0;
 
-// ---------- PLAYER ----------
-let player;
-
-// ---------- TITANS ----------
+let player = null;
 let titans = [];
-
-// ---------- CONTROLS ----------
 let keys = {};
 
+// ---------- INPUT ----------
 document.addEventListener("keydown", e=>{
   keys[e.key] = true;
 
@@ -59,8 +65,10 @@ document.addEventListener("keydown", e=>{
   }
 
   if(gameState==="playing" && e.key===" "){
-    player.attacking = true;
-    player.attackTimer = 10;
+    if(player){
+      player.attacking = true;
+      player.attackTimer = 10;
+    }
   }
 
   if(gameState==="gameover" && e.key==="Enter"){
@@ -84,9 +92,8 @@ function startGame(){
     attackTimer:0
   };
 
-  titans=[];
+  titans = [];
   spawnWave();
-
   gameState="playing";
 }
 
@@ -103,6 +110,8 @@ function spawnWave(){
 
 // ---------- UPDATE ----------
 function update(){
+  if(!player) return;
+
   let moving = false;
 
   if(keys["w"]){ player.y-=5; moving=true; }
@@ -112,33 +121,33 @@ function update(){
 
   if(moving){
     player.frameTick++;
-    if(player.frameTick > 8){
-      player.frame = (player.frame+1)%2;
-      player.frameTick = 0;
+    if(player.frameTick>8){
+      player.frame=(player.frame+1)%2;
+      player.frameTick=0;
     }
   } else {
-    player.frame = 0;
+    player.frame=0;
   }
 
+  // attack
   if(player.attacking){
     player.attackTimer--;
 
-    titans.forEach((t,i)=>{
+    for(let i=titans.length-1;i>=0;i--){
+      let t = titans[i];
       let dx=player.x-t.x;
       let dy=player.y-t.y;
       let dist=Math.sqrt(dx*dx+dy*dy);
 
-      if(dist < 80){
-        titans.splice(i,1);
-      }
-    });
-
-    if(player.attackTimer<=0){
-      player.attacking=false;
+      if(dist<80) titans.splice(i,1);
     }
+
+    if(player.attackTimer<=0) player.attacking=false;
   }
 
-  titans.forEach((t,i)=>{
+  // titan movement
+  for(let i=titans.length-1;i>=0;i--){
+    let t = titans[i];
     let dx=player.x-t.x;
     let dy=player.y-t.y;
     let dist=Math.sqrt(dx*dx+dy*dy);
@@ -146,7 +155,7 @@ function update(){
     t.x += (dx/dist)*t.speed;
     t.y += (dy/dist)*t.speed;
 
-    if(dist < 40){
+    if(dist<40){
       player.health--;
       titans.splice(i,1);
 
@@ -154,15 +163,16 @@ function update(){
         gameState="gameover";
       }
     }
-  });
+  }
 
   if(titans.length===0) spawnWave();
 }
 
-// ---------- SPRITE POS ----------
-function getSpritePos(index){
+// ---------- SPRITE ----------
+function getSprite(index){
   let col = index % 3;
   let row = Math.floor(index / 3);
+
   return {
     sx: col * frameWidth,
     sy: row * frameHeight
@@ -171,26 +181,31 @@ function getSpritePos(index){
 
 // ---------- DRAW PLAYER ----------
 function drawPlayer(){
-  let pos = getSpritePos(player.index);
+  if(!player || !spriteReady) return;
+
+  let pos = getSprite(player.index);
 
   ctx.save();
 
   if(player.facing === -1){
     ctx.scale(-1,1);
-    ctx.drawImage(sprite, pos.sx, pos.sy, frameWidth, frameHeight,
-      -player.x-64, player.y + player.frame*2, 64, 64);
+    ctx.drawImage(sprite,
+      pos.sx,pos.sy,frameWidth,frameHeight,
+      -player.x-64,player.y+player.frame*2,64,64);
   } else {
-    ctx.drawImage(sprite, pos.sx, pos.sy, frameWidth, frameHeight,
-      player.x, player.y + player.frame*2, 64, 64);
+    ctx.drawImage(sprite,
+      pos.sx,pos.sy,frameWidth,frameHeight,
+      player.x,player.y+player.frame*2,64,64);
   }
 
   ctx.restore();
 
+  // blade
   if(player.attacking){
     ctx.save();
-    ctx.translate(player.x+32, player.y+32);
+    ctx.translate(player.x+32,player.y+32);
 
-    let angle = (10 - player.attackTimer) * 0.3 * player.facing;
+    let angle=(10-player.attackTimer)*0.3*player.facing;
     ctx.rotate(angle);
 
     ctx.fillStyle="white";
@@ -205,40 +220,47 @@ function drawMenu(){
   ctx.fillStyle="black";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
+  ctx.fillStyle="white";
+  ctx.fillText("SELECT CHARACTER", canvas.width/2,100);
+
   let startX = canvas.width/2 - (characters.length * 100)/2;
 
-  characters.forEach((name,i)=>{
-    let x = startX + i*100;
-    let y = canvas.height/2;
+  for(let i=0;i<characters.length;i++){
+    let x=startX+i*100;
+    let y=canvas.height/2;
 
-    let pos = getSpritePos(i);
+    if(spriteReady){
+      let pos=getSprite(i);
+      ctx.drawImage(sprite,pos.sx,pos.sy,frameWidth,frameHeight,x-32,y-32,64,64);
+    }
 
-    ctx.drawImage(sprite, pos.sx, pos.sy, frameWidth, frameHeight,
-      x-32, y-32, 64, 64);
-
-    if(i === selectedCharacter){
+    if(i===selectedCharacter){
       ctx.strokeStyle="yellow";
       ctx.strokeRect(x-40,y-40,80,80);
     }
 
     ctx.fillStyle="white";
-    ctx.fillText(name,x,y+60);
-  });
+    ctx.fillText(characters[i],x,y+60);
+  }
 }
 
 // ---------- DRAW ----------
 function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="black";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
   drawPlayer();
 
-  titans.forEach(t=>{
-    ctx.fillStyle="red";
+  // titans
+  ctx.fillStyle="red";
+  for(let t of titans){
     ctx.fillRect(t.x,t.y,40,60);
-  });
+  }
 
-  ctx.fillStyle="white";
-  ctx.fillText("HP: "+player.health,60,30);
+  if(player){
+    ctx.fillStyle="white";
+    ctx.fillText("HP: "+player.health,60,30);
+  }
 }
 
 // ---------- GAME OVER ----------
@@ -247,23 +269,26 @@ function drawGameOver(){
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
   ctx.fillStyle="red";
-  ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2);
+  ctx.fillText("GAME OVER",canvas.width/2,canvas.height/2);
 }
 
 // ---------- LOOP ----------
-function gameLoop(){
+function loop(){
   if(gameState==="loading"){
     ctx.fillStyle="black";
     ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle="white";
-    ctx.fillText("LOADING...", canvas.width/2, canvas.height/2);
+    ctx.fillText("LOADING...",canvas.width/2,canvas.height/2);
   }
   else if(gameState==="menu") drawMenu();
   else if(gameState==="playing"){ update(); draw(); }
   else if(gameState==="gameover") drawGameOver();
 
-  requestAnimationFrame(gameLoop);
+  requestAnimationFrame(loop);
 }
 
-gameLoop();
+loop();
 </script>
+
+</body>
+</html>
