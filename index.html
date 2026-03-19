@@ -71,6 +71,11 @@ document.addEventListener("keydown", e=>{
     }
   }
 
+  if(gameState==="playing" && e.key==="Shift"){
+    player.dashing = true;
+    player.dashTimer = 10;
+  }
+
   if(gameState==="gameover" && e.key==="Enter"){
     gameState="menu";
   }
@@ -85,9 +90,12 @@ function startGame(){
     y:canvas.height/2,
     health:3,
     index:selectedCharacter,
-    facing:1,
+
     attacking:false,
-    attackTimer:0
+    attackTimer:0,
+
+    dashing:false,
+    dashTimer:0
   };
 
   titans = [];
@@ -110,17 +118,17 @@ function spawnWave(){
 function update(){
   if(!player) return;
 
-  if(keys["w"]) player.y-=5;
-  if(keys["s"]) player.y+=5;
+  let speed = player.dashing ? 10 : 5;
 
-  if(keys["a"]){
-    player.x -= 5;
-    player.facing = -1;
-  }
+  if(keys["w"]) player.y-=speed;
+  if(keys["s"]) player.y+=speed;
+  if(keys["a"]) player.x-=speed;
+  if(keys["d"]) player.x+=speed;
 
-  if(keys["d"]){
-    player.x += 5;
-    player.facing = 1;
+  // dash timer
+  if(player.dashing){
+    player.dashTimer--;
+    if(player.dashTimer<=0) player.dashing=false;
   }
 
   // attack
@@ -166,14 +174,13 @@ function update(){
 function getSprite(index){
   let col = index % 3;
   let row = Math.floor(index / 3);
-
   return {
     sx: col * frameWidth,
     sy: row * frameHeight
   };
 }
 
-// ---------- DRAW PLAYER (FIXED FLIP) ----------
+// ---------- DRAW PLAYER ----------
 function drawPlayer(){
   if(!player || !spriteReady) return;
 
@@ -181,11 +188,18 @@ function drawPlayer(){
 
   ctx.save();
 
-  // move to center
   ctx.translate(player.x + 32, player.y + 32);
 
-  // flip correctly
-  ctx.scale(player.facing, 1);
+  // 🔥 rotation instead of flip
+  let angle = 0;
+
+  if(player.dashing && player.attacking){
+    angle = (10 - player.attackTimer) * 0.8; // spin
+  }
+  else if(keys["a"]) angle = -0.15;
+  else if(keys["d"]) angle = 0.15;
+
+  ctx.rotate(angle);
 
   ctx.drawImage(
     sprite,
@@ -197,16 +211,20 @@ function drawPlayer(){
 
   ctx.restore();
 
-  // blade animation
+  // 🔥 attack + trail
   if(player.attacking){
     ctx.save();
     ctx.translate(player.x+32, player.y+32);
 
-    let angle = (10 - player.attackTimer) * 0.4 * player.facing;
-    ctx.rotate(angle);
+    let swing = (10 - player.attackTimer) * 0.6;
+    ctx.rotate(swing);
 
     ctx.fillStyle="white";
     ctx.fillRect(0,-4,55,8);
+
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle="cyan";
+    ctx.fillRect(-10,-6,70,12);
 
     ctx.restore();
   }
@@ -252,6 +270,20 @@ function draw(){
   ctx.fillStyle="red";
   for(let t of titans){
     ctx.fillRect(t.x,t.y,40,60);
+  }
+
+  // 🔥 speed lines
+  if(player && player.dashing){
+    ctx.strokeStyle="white";
+    for(let i=0;i<5;i++){
+      ctx.beginPath();
+      ctx.moveTo(player.x+32, player.y+32);
+      ctx.lineTo(
+        player.x + Math.random()*100 - 50,
+        player.y + Math.random()*100 - 50
+      );
+      ctx.stroke();
+    }
   }
 
   if(player){
