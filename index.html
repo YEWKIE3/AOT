@@ -3,7 +3,6 @@
 <head>
   <title>AOT Survival</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
     body { margin:0; overflow:hidden; background:#1e1e2f; }
     canvas { display:block; }
   </style>
@@ -18,17 +17,21 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// ---------- SPRITE LOADING (FIXED) ----------
+// ---------- SPRITE LOADING ----------
 let spriteSheet = new Image();
 let spriteLoaded = false;
 
 spriteSheet.onload = () => {
+  console.log("SPRITE LOADED");
   spriteLoaded = true;
 };
 
-spriteSheet.src = "sprites.png";
+spriteSheet.onerror = () => {
+  console.log("SPRITE FAILED TO LOAD");
+};
 
-// try different sizes if needed
+spriteSheet.src = "./sprites.png"; // MAKE SURE FILE IS IN SAME FOLDER
+
 const SPRITE_SIZE = 64;
 
 // ---------- SPRITE MAP ----------
@@ -54,7 +57,6 @@ function drawLoading(){
   ctx.textAlign="center";
   ctx.fillText("LOADING SPRITES...", canvas.width/2, canvas.height/2);
 
-  // WAIT until sprite loads
   if(spriteLoaded){
     gameState = "menu";
   }
@@ -62,12 +64,12 @@ function drawLoading(){
 
 // ---------- CHARACTERS ----------
 let characters = [
- {name:"Eren",speed:5,health:3,range:40,ability:"rage"},
- {name:"Mikasa",speed:8,health:2,range:30,ability:"dash"},
- {name:"Armin",speed:4,health:3,range:50,ability:"mark"},
- {name:"Levi",speed:7,health:2,range:70,ability:"spin"},
- {name:"Reiner",speed:3,health:5,range:50,ability:"armor"},
- {name:"Annie",speed:5,health:3,range:45,ability:"counter"}
+ {name:"Eren",speed:5,health:3,range:40},
+ {name:"Mikasa",speed:8,health:2,range:30},
+ {name:"Armin",speed:4,health:3,range:50},
+ {name:"Levi",speed:7,health:2,range:70},
+ {name:"Reiner",speed:3,health:5,range:50},
+ {name:"Annie",speed:5,health:3,range:45}
 ];
 
 // ---------- MENU ----------
@@ -88,10 +90,30 @@ function drawMenu(){
     let x = startX + i*100;
     let y = canvas.height/2;
 
-    ctx.fillStyle = i===selectedCharacter ? "yellow" : "gray";
-    ctx.fillRect(x-40,y-40,80,80);
+    let sprite = spriteMap[c.name];
 
-    ctx.fillStyle="black";
+    // DRAW SPRITE
+    if(spriteLoaded){
+      ctx.drawImage(
+        spriteSheet,
+        0, sprite.row * SPRITE_SIZE,
+        SPRITE_SIZE, SPRITE_SIZE,
+        x-32, y-32,
+        64, 64
+      );
+    } else {
+      ctx.fillStyle="gray";
+      ctx.fillRect(x-40,y-40,80,80);
+    }
+
+    // HIGHLIGHT
+    if(i === selectedCharacter){
+      ctx.strokeStyle="yellow";
+      ctx.lineWidth=3;
+      ctx.strokeRect(x-40,y-40,80,80);
+    }
+
+    ctx.fillStyle="white";
     ctx.fillText(c.name,x,y+60);
   });
 }
@@ -108,12 +130,8 @@ function createPlayer(c){
     health:c.health,
     maxHealth:c.health,
     range:c.range,
-    ability:c.ability,
-
-    // animation
     frame:0,
     frameTimer:0,
-    state:"idle",
     facing:1
   };
 }
@@ -132,11 +150,6 @@ document.addEventListener("keydown",e=>{
 
     if(selectedCharacter<0) selectedCharacter=characters.length-1;
     if(selectedCharacter>=characters.length) selectedCharacter=0;
-  }
-
-  if(gameState==="playing" && e.key===" "){
-    attacking=true;
-    attackTimer=10;
   }
 
   if(gameState==="gameover" && e.key==="Enter"){
@@ -160,35 +173,14 @@ function spawnWave(){
   }
 }
 
-// ---------- ATTACK ----------
-let attacking=false;
-let attackTimer=0;
-
-function attack(){
-  titans.forEach((t,i)=>{
-    let dx=player.x-t.x;
-    let dy=player.y-t.y;
-    let dist=Math.sqrt(dx*dx+dy*dy);
-
-    if(dist < player.range){
-      titans.splice(i,1);
-    }
-  });
-}
-
 // ---------- UPDATE ----------
 function update(){
-  let moving = false;
+  if(keys["w"]) player.y-=player.speed;
+  if(keys["s"]) player.y+=player.speed;
+  if(keys["a"]){ player.x-=player.speed; player.facing=-1; }
+  if(keys["d"]){ player.x+=player.speed; player.facing=1; }
 
-  if(keys["w"]){ player.y-=player.speed; moving=true; }
-  if(keys["s"]){ player.y+=player.speed; moving=true; }
-  if(keys["a"]){ player.x-=player.speed; player.facing=-1; moving=true; }
-  if(keys["d"]){ player.x+=player.speed; player.facing=1; moving=true; }
-
-  player.state = moving ? "walk" : "idle";
-  if(attacking) player.state = "attack";
-
-  // animation frames
+  // animation
   player.frameTimer++;
   if(player.frameTimer > 8){
     player.frame++;
@@ -196,7 +188,7 @@ function update(){
   }
   if(player.frame > 3) player.frame = 0;
 
-  titans.forEach(t=>{
+  titans.forEach((t,i)=>{
     let dx=player.x-t.x;
     let dy=player.y-t.y;
     let dist=Math.sqrt(dx*dx+dy*dy);
@@ -206,20 +198,13 @@ function update(){
 
     if(dist < 40){
       player.health--;
-      t.x=Math.random()*canvas.width;
-      t.y=Math.random()*canvas.height;
+      titans.splice(i,1);
 
       if(player.health<=0){
         gameState="gameover";
       }
     }
   });
-
-  if(attacking){
-    attackTimer--;
-    attack();
-    if(attackTimer<=0) attacking=false;
-  }
 
   if(titans.length===0){
     wave++;
