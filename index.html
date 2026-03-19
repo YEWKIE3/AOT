@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AOT Ultimate Survival</title>
+  <title>AOT Ultimate Survival Pro</title>
   <style>
     body { margin:0; overflow:hidden; background:#111; }
     canvas { display:block; background:#111; }
     #ui {
-      position:absolute; top:10px; left:10px; color:white; font-family:sans-serif; font-size:20px;
+      position:absolute; top:10px; left:10px; color:white;
+      font-family:sans-serif; font-size:20px; z-index:10;
     }
   </style>
 </head>
@@ -22,11 +23,11 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 // --- Sprites ---
-const playerSprite = new Image();
-playerSprite.src = "./sprites.png"; // pixel-art spritesheet
+const sprite = new Image();
+sprite.src = "./sprites.png"; // pixel-art sheet
 let spriteReady = false;
-let frameWidth = 64, frameHeight = 64; // adjust to your sprite frame size
-playerSprite.onload = () => spriteReady = true;
+const frameWidth = 64, frameHeight = 64;
+sprite.onload = ()=> spriteReady=true;
 
 // --- Game State ---
 let gameState = "loading";
@@ -35,7 +36,8 @@ let selectedCharacter = 0;
 let player = null;
 let titans = [];
 let keys = {};
-let score = 0, wave = 1, powerUp = null;
+let score=0, wave=1, powerUp=null;
+let shake=0;
 
 // --- Input ---
 document.addEventListener("keydown", e=>{
@@ -46,38 +48,37 @@ document.addEventListener("keydown", e=>{
     if(e.key==="Enter") startGame();
   }
   if(gameState==="playing"){
-    if(e.key===" ") playerAttack();
-    if(e.key==="Shift") playerDash();
+    if(e.key===" ") attack();
+    if(e.key==="Shift") dash();
   }
-  if(gameState==="gameover" && e.key==="Enter") { gameState="menu"; score=0; wave=1; }
+  if(gameState==="gameover" && e.key==="Enter"){ gameState="menu"; score=0; wave=1; }
 });
 document.addEventListener("keyup", e=> keys[e.key]=false);
 
-// --- Player Functions ---
+// --- Player ---
 function startGame(){
-  player = {
+  player={
     x:canvas.width/2, y:canvas.height/2,
     health:3, index:selectedCharacter,
-    attacking:false, attackTimer:0,
+    attacking:false, attackTimer:0, combo:0,
     dashing:false, dashTimer:0,
     animFrame:0, animTimer:0,
-    combo:0
+    power:null, powerTimer:0
   };
   titans=[];
   spawnWave();
   gameState="playing";
 }
 
-function playerAttack(){
-  if(player && !player.attacking){
+function attack(){
+  if(player&&!player.attacking){
     player.attacking=true;
     player.attackTimer=12;
     player.combo=(player.combo+1)%3;
   }
 }
-
-function playerDash(){
-  if(player && !player.dashing){
+function dash(){
+  if(player&&!player.dashing){
     player.dashing=true;
     player.dashTimer=12;
   }
@@ -87,12 +88,13 @@ function playerDash(){
 function spawnWave(){
   wave++;
   for(let i=0;i<3+wave;i++){
+    const size=Math.random()*40+30;
     titans.push({
       x:Math.random()*canvas.width,
       y:Math.random()*canvas.height,
       speed:1+Math.random()*wave*0.3,
-      size:30+Math.random()*30,
-      animFrame:0, animTimer:0
+      size:size, animFrame:0, animTimer:0,
+      boss: wave%5===0 && i===0 // first titan every 5 waves is boss
     });
   }
 }
@@ -100,6 +102,8 @@ function spawnWave(){
 // --- Update ---
 function update(){
   if(!player) return;
+
+  // Movement
   const speed = player.dashing?10:5;
   if(keys["w"]) player.y-=speed;
   if(keys["s"]) player.y+=speed;
@@ -112,36 +116,62 @@ function update(){
   // Attack
   if(player.attacking){
     player.attackTimer--;
-    for(let i=titans.length-1;i>=0;i--){
-      let t=titans[i];
+    titans.forEach((t,i)=>{
       const dx=player.x-t.x, dy=player.y-t.y, dist=Math.sqrt(dx*dx+dy*dy);
-      if(dist<t.size+40){ titans.splice(i,1); score+=10; shakeScreen(); }
-    }
+      if(dist<t.size+40){ titans.splice(i,1); score+= t.boss?50:10; screenShake(); spawnPowerUp(t.x,t.y); }
+    });
     if(player.attackTimer<=0) player.attacking=false;
   }
 
   // Titan AI
-  for(let t of titans){
+  titans.forEach(t=>{
     const dx=player.x-t.x, dy=player.y-t.y, dist=Math.sqrt(dx*dx+dy*dy);
     t.x += (dx/dist)*t.speed;
     t.y += (dy/dist)*t.speed;
-    if(dist<t.size+20){ player.health--; titans.splice(titans.indexOf(t),1); shakeScreen(); if(player.health<=0) gameState="gameover"; }
-  }
+    if(dist<t.size+20){ player.health--; titans.splice(titans.indexOf(t),1); screenShake(); if(player.health<=0) gameState="gameover"; }
+  });
 
-  // Animation timers
+  // Animations
   player.animTimer++; if(player.animTimer>5){ player.animFrame=(player.animFrame+1)%4; player.animTimer=0; }
-  for(let t of titans){ t.animTimer++; if(t.animTimer>10){ t.animFrame=(t.animFrame+1)%2; t.animTimer=0; } }
+  titans.forEach(t=>{ t.animTimer++; if(t.animTimer>10){ t.animFrame=(t.animFrame+1)%2; t.animTimer=0; } });
 
+  // Power-up timer
+  if(player.power){ player.powerTimer--; if(player.powerTimer<=0) player.power=null; }
+
+  // Spawn new wave
   if(titans.length===0) spawnWave();
+
   updateUI();
 }
 
+// --- Power-ups ---
+let powerUps=[];
+function spawnPowerUp(x,y){
+  const types=["Health","Speed","Attack"];
+  const p={x,y,type:types[Math.floor(Math.random()*types.length)],timer:600};
+  powerUps.push(p);
+}
+function checkPowerUps(){
+  powerUps.forEach((p,i)=>{
+    const dx=p.x-player.x, dy=p.y-player.y, dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<40){
+      player.power=p.type; player.powerTimer=600;
+      if(p.type==="Health") player.health=Math.min(player.health+1,5);
+      else if(p.type==="Speed"){} // affects speed dynamically
+      else if(p.type==="Attack"){} // affects attack logic
+      powerUps.splice(i,1);
+    }
+    p.timer--; if(p.timer<=0) powerUps.splice(i,1);
+  });
+}
+
 // --- UI ---
-function updateUI(){ document.getElementById("ui").innerText=`HP: ${player.health} | Score: ${score} | Wave: ${wave} | Power: ${powerUp||"None"}`; }
+function updateUI(){
+  document.getElementById("ui").innerText=`HP: ${player.health} | Score: ${score} | Wave: ${wave} | Power: ${player.power||"None"}`;
+}
 
 // --- Effects ---
-let shake=0;
-function shakeScreen(){ shake=8; }
+function screenShake(){ shake=8; }
 
 // --- Draw ---
 function draw(){
@@ -150,19 +180,25 @@ function draw(){
 
   ctx.fillStyle="#111"; ctx.fillRect(0,0,canvas.width,canvas.height);
 
+  // Power-ups
+  powerUps.forEach(p=>{
+    ctx.fillStyle=p.type==="Health"?"green":p.type==="Speed"?"blue":"orange";
+    ctx.fillRect(p.x-10,p.y-10,20,20);
+  });
+
   // Draw titans
-  for(let t of titans){
-    ctx.fillStyle="red";
+  titans.forEach(t=>{
+    ctx.fillStyle=t.boss?"darkred":"red";
     ctx.beginPath();
     ctx.ellipse(t.x,t.y,t.size/2,t.size,0,0,Math.PI*2);
     ctx.fill();
-  }
+  });
 
   // Draw player
   if(spriteReady){
-    const frameX = player.animFrame*frameWidth;
-    const frameY = player.index*frameHeight;
-    ctx.drawImage(playerSprite, frameX, frameY, frameWidth, frameHeight, player.x-32, player.y-32, 64, 64);
+    const fx=player.animFrame*frameWidth;
+    const fy=player.index*frameHeight;
+    ctx.drawImage(sprite, fx, fy, frameWidth, frameHeight, player.x-32, player.y-32, 64, 64);
   }
 
   // Attack trail
@@ -172,8 +208,7 @@ function draw(){
     ctx.rotate(Math.random()*0.6-0.3);
     ctx.fillStyle="cyan"; ctx.globalAlpha=0.5;
     ctx.fillRect(0,-6,70,12);
-    ctx.globalAlpha=1;
-    ctx.restore();
+    ctx.globalAlpha=1; ctx.restore();
   }
 
   // Dash effect
@@ -182,7 +217,7 @@ function draw(){
     for(let i=0;i<5;i++){
       ctx.beginPath();
       ctx.moveTo(player.x,player.y);
-      ctx.lineTo(player.x+Math.random()*100-50, player.y+Math.random()*100-50);
+      ctx.lineTo(player.x+Math.random()*100-50,player.y+Math.random()*100-50);
       ctx.stroke();
     }
   }
@@ -196,12 +231,12 @@ function drawMenu(){
   ctx.fillStyle="white"; ctx.textAlign="center"; ctx.font="40px sans-serif";
   ctx.fillText("SELECT CHARACTER", canvas.width/2,100);
   const startX=canvas.width/2-(characters.length*100)/2;
-  for(let i=0;i<characters.length;i++){
+  characters.forEach((c,i)=>{
     const x=startX+i*100, y=canvas.height/2;
-    if(spriteReady){ ctx.drawImage(playerSprite,0,i*frameHeight,frameWidth,frameHeight,x-32,y-32,64,64); }
+    if(spriteReady) ctx.drawImage(sprite,0,i*frameHeight,frameWidth,frameHeight,x-32,y-32,64,64);
     if(i===selectedCharacter){ ctx.strokeStyle="yellow"; ctx.strokeRect(x-40,y-40,80,80); }
-    ctx.fillStyle="white"; ctx.fillText(characters[i], x, y+60);
-  }
+    ctx.fillStyle="white"; ctx.fillText(c,x,y+60);
+  });
 }
 
 // --- Game Over ---
@@ -216,14 +251,14 @@ function loop(){
   if(gameState==="loading"){
     ctx.fillStyle="#111"; ctx.fillRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle="white"; ctx.textAlign="center"; ctx.font="40px sans-serif";
-    ctx.fillText("LOADING...", canvas.width/2, canvas.height/2);
+    ctx.fillText("LOADING...",canvas.width/2,canvas.height/2);
   } else if(gameState==="menu") drawMenu();
-  else if(gameState==="playing"){ update(); draw(); }
+  else if(gameState==="playing"){ update(); checkPowerUps(); draw(); }
   else if(gameState==="gameover") drawGameOver();
   requestAnimationFrame(loop);
 }
 loop();
-</script>
 
+</script>
 </body>
 </html>
