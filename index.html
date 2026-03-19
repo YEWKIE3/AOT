@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AOT Ultimate Survival Pro</title>
+  <title>AOT Pixel Survival</title>
   <style>
     body { margin:0; overflow:hidden; background:#111; }
     canvas { display:block; background:#111; }
     #ui {
       position:absolute; top:10px; left:10px; color:white;
-      font-family:sans-serif; font-size:20px; z-index:10;
+      font-family:sans-serif; font-size:20px;
     }
   </style>
 </head>
@@ -22,15 +22,8 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// --- Sprites ---
-const sprite = new Image();
-sprite.src = "./sprites.png"; // pixel-art sheet
-let spriteReady = false;
-const frameWidth = 64, frameHeight = 64;
-sprite.onload = ()=> spriteReady=true;
-
 // --- Game State ---
-let gameState = "loading";
+let gameState = "menu";
 let characters = ["Eren","Mikasa","Armin","Levi","Reiner","Annie"];
 let selectedCharacter = 0;
 let player = null;
@@ -38,6 +31,7 @@ let titans = [];
 let keys = {};
 let score=0, wave=1, powerUp=null;
 let shake=0;
+let powerUps=[];
 
 // --- Input ---
 document.addEventListener("keydown", e=>{
@@ -70,19 +64,8 @@ function startGame(){
   gameState="playing";
 }
 
-function attack(){
-  if(player&&!player.attacking){
-    player.attacking=true;
-    player.attackTimer=12;
-    player.combo=(player.combo+1)%3;
-  }
-}
-function dash(){
-  if(player&&!player.dashing){
-    player.dashing=true;
-    player.dashTimer=12;
-  }
-}
+function attack(){ if(player&&!player.attacking){ player.attacking=true; player.attackTimer=12; player.combo=(player.combo+1)%3; } }
+function dash(){ if(player&&!player.dashing){ player.dashing=true; player.dashTimer=12; } }
 
 // --- Titans ---
 function spawnWave(){
@@ -94,7 +77,7 @@ function spawnWave(){
       y:Math.random()*canvas.height,
       speed:1+Math.random()*wave*0.3,
       size:size, animFrame:0, animTimer:0,
-      boss: wave%5===0 && i===0 // first titan every 5 waves is boss
+      boss: wave%5===0 && i===0
     });
   }
 }
@@ -110,10 +93,8 @@ function update(){
   if(keys["a"]) player.x-=speed;
   if(keys["d"]) player.x+=speed;
 
-  // Dash
   if(player.dashing){ player.dashTimer--; if(player.dashTimer<=0) player.dashing=false; }
 
-  // Attack
   if(player.attacking){
     player.attackTimer--;
     titans.forEach((t,i)=>{
@@ -123,7 +104,6 @@ function update(){
     if(player.attackTimer<=0) player.attacking=false;
   }
 
-  // Titan AI
   titans.forEach(t=>{
     const dx=player.x-t.x, dy=player.y-t.y, dist=Math.sqrt(dx*dx+dy*dy);
     t.x += (dx/dist)*t.speed;
@@ -135,40 +115,26 @@ function update(){
   player.animTimer++; if(player.animTimer>5){ player.animFrame=(player.animFrame+1)%4; player.animTimer=0; }
   titans.forEach(t=>{ t.animTimer++; if(t.animTimer>10){ t.animFrame=(t.animFrame+1)%2; t.animTimer=0; } });
 
-  // Power-up timer
-  if(player.power){ player.powerTimer--; if(player.powerTimer<=0) player.power=null; }
+  // Power-ups
+  powerUps.forEach((p,i)=>{
+    const dx=p.x-player.x, dy=p.y-player.y, dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<40){ player.power=p.type; player.powerTimer=600; if(p.type==="Health") player.health=Math.min(player.health+1,5); powerUps.splice(i,1); }
+    p.timer--; if(p.timer<=0) powerUps.splice(i,1);
+  });
 
-  // Spawn new wave
   if(titans.length===0) spawnWave();
-
   updateUI();
 }
 
 // --- Power-ups ---
-let powerUps=[];
 function spawnPowerUp(x,y){
   const types=["Health","Speed","Attack"];
   const p={x,y,type:types[Math.floor(Math.random()*types.length)],timer:600};
   powerUps.push(p);
 }
-function checkPowerUps(){
-  powerUps.forEach((p,i)=>{
-    const dx=p.x-player.x, dy=p.y-player.y, dist=Math.sqrt(dx*dx+dy*dy);
-    if(dist<40){
-      player.power=p.type; player.powerTimer=600;
-      if(p.type==="Health") player.health=Math.min(player.health+1,5);
-      else if(p.type==="Speed"){} // affects speed dynamically
-      else if(p.type==="Attack"){} // affects attack logic
-      powerUps.splice(i,1);
-    }
-    p.timer--; if(p.timer<=0) powerUps.splice(i,1);
-  });
-}
 
 // --- UI ---
-function updateUI(){
-  document.getElementById("ui").innerText=`HP: ${player.health} | Score: ${score} | Wave: ${wave} | Power: ${player.power||"None"}`;
-}
+function updateUI(){ document.getElementById("ui").innerText=`HP: ${player.health} | Score: ${score} | Wave: ${wave} | Power: ${player.power||"None"}`; }
 
 // --- Effects ---
 function screenShake(){ shake=8; }
@@ -186,7 +152,7 @@ function draw(){
     ctx.fillRect(p.x-10,p.y-10,20,20);
   });
 
-  // Draw titans
+  // Titans
   titans.forEach(t=>{
     ctx.fillStyle=t.boss?"darkred":"red";
     ctx.beginPath();
@@ -194,22 +160,25 @@ function draw(){
     ctx.fill();
   });
 
-  // Draw player
-  if(spriteReady){
-    const fx=player.animFrame*frameWidth;
-    const fy=player.index*frameHeight;
-    ctx.drawImage(sprite, fx, fy, frameWidth, frameHeight, player.x-32, player.y-32, 64, 64);
-  }
+  // Player
+  ctx.save();
+  ctx.translate(player.x,player.y);
+  let angle=0;
+  if(player.attacking) angle=Math.sin(player.attackTimer/2)*0.5;
+  if(player.dashing) angle+=0.2;
+  ctx.rotate(angle);
 
-  // Attack trail
+  // Body
+  ctx.fillStyle="cyan"; ctx.fillRect(-10,-16,20,32);
+  // Head
+  ctx.fillStyle="white"; ctx.fillRect(-6,-24,12,8);
+  // Blades (attack)
   if(player.attacking){
-    ctx.save();
-    ctx.translate(player.x,player.y);
-    ctx.rotate(Math.random()*0.6-0.3);
-    ctx.fillStyle="cyan"; ctx.globalAlpha=0.5;
-    ctx.fillRect(0,-6,70,12);
-    ctx.globalAlpha=1; ctx.restore();
+    ctx.fillStyle="yellow";
+    ctx.fillRect(10,-4,20,4);
+    ctx.fillRect(-30,-4,20,4);
   }
+  ctx.restore();
 
   // Dash effect
   if(player.dashing){
@@ -217,7 +186,7 @@ function draw(){
     for(let i=0;i<5;i++){
       ctx.beginPath();
       ctx.moveTo(player.x,player.y);
-      ctx.lineTo(player.x+Math.random()*100-50,player.y+Math.random()*100-50);
+      ctx.lineTo(player.x+Math.random()*100-50, player.y+Math.random()*100-50);
       ctx.stroke();
     }
   }
@@ -233,9 +202,10 @@ function drawMenu(){
   const startX=canvas.width/2-(characters.length*100)/2;
   characters.forEach((c,i)=>{
     const x=startX+i*100, y=canvas.height/2;
-    if(spriteReady) ctx.drawImage(sprite,0,i*frameHeight,frameWidth,frameHeight,x-32,y-32,64,64);
-    if(i===selectedCharacter){ ctx.strokeStyle="yellow"; ctx.strokeRect(x-40,y-40,80,80); }
-    ctx.fillStyle="white"; ctx.fillText(c,x,y+60);
+    ctx.fillStyle=i===selectedCharacter?"yellow":"white";
+    ctx.fillRect(x-16,y-32,32,32);
+    ctx.fillStyle="white";
+    ctx.fillText(c,x,y+40);
   });
 }
 
@@ -248,17 +218,13 @@ function drawGameOver(){
 
 // --- Loop ---
 function loop(){
-  if(gameState==="loading"){
-    ctx.fillStyle="#111"; ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle="white"; ctx.textAlign="center"; ctx.font="40px sans-serif";
-    ctx.fillText("LOADING...",canvas.width/2,canvas.height/2);
-  } else if(gameState==="menu") drawMenu();
-  else if(gameState==="playing"){ update(); checkPowerUps(); draw(); }
+  if(gameState==="menu") drawMenu();
+  else if(gameState==="playing"){ update(); draw(); }
   else if(gameState==="gameover") drawGameOver();
   requestAnimationFrame(loop);
 }
 loop();
-
 </script>
+
 </body>
 </html>
