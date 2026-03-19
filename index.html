@@ -20,9 +20,6 @@ canvas.height = window.innerHeight;
 ctx.font = "20px Arial";
 ctx.textAlign = "center";
 
-// ---------- STATE ----------
-let gameState = "loading";
-
 // ---------- IMAGE ----------
 let sprite = new Image();
 let spriteReady = false;
@@ -36,21 +33,24 @@ sprite.onload = () => {
   gameState = "menu";
 };
 
-sprite.onerror = () => {
-  console.log("IMAGE FAILED TO LOAD");
-};
-
 sprite.src = "./sprites.png";
 
-// ---------- DATA ----------
+// ---------- STATE ----------
+let gameState = "loading";
+
+// ---------- CHARACTERS ----------
 let characters = ["Eren","Mikasa","Armin","Levi","Reiner","Annie"];
 let selectedCharacter = 0;
 
+// ---------- PLAYER ----------
 let player = null;
+
+// ---------- TITANS ----------
 let titans = [];
-let keys = {};
 
 // ---------- INPUT ----------
+let keys = {};
+
 document.addEventListener("keydown", e=>{
   keys[e.key] = true;
 
@@ -86,8 +86,6 @@ function startGame(){
     health:3,
     index:selectedCharacter,
     facing:1,
-    frame:0,
-    frameTick:0,
     attacking:false,
     attackTimer:0
   };
@@ -112,21 +110,17 @@ function spawnWave(){
 function update(){
   if(!player) return;
 
-  let moving = false;
+  if(keys["w"]) player.y-=5;
+  if(keys["s"]) player.y+=5;
 
-  if(keys["w"]){ player.y-=5; moving=true; }
-  if(keys["s"]){ player.y+=5; moving=true; }
-  if(keys["a"]){ player.x-=5; player.facing=-1; moving=true; }
-  if(keys["d"]){ player.x+=5; player.facing=1; moving=true; }
+  if(keys["a"]){
+    player.x -= 5;
+    player.facing = -1;
+  }
 
-  if(moving){
-    player.frameTick++;
-    if(player.frameTick>8){
-      player.frame=(player.frame+1)%2;
-      player.frameTick=0;
-    }
-  } else {
-    player.frame=0;
+  if(keys["d"]){
+    player.x += 5;
+    player.facing = 1;
   }
 
   // attack
@@ -179,7 +173,7 @@ function getSprite(index){
   };
 }
 
-// ---------- DRAW PLAYER ----------
+// ---------- DRAW PLAYER (FIXED FLIP) ----------
 function drawPlayer(){
   if(!player || !spriteReady) return;
 
@@ -187,29 +181,32 @@ function drawPlayer(){
 
   ctx.save();
 
-  if(player.facing === -1){
-    ctx.scale(-1,1);
-    ctx.drawImage(sprite,
-      pos.sx,pos.sy,frameWidth,frameHeight,
-      -player.x-64,player.y+player.frame*2,64,64);
-  } else {
-    ctx.drawImage(sprite,
-      pos.sx,pos.sy,frameWidth,frameHeight,
-      player.x,player.y+player.frame*2,64,64);
-  }
+  // move to center
+  ctx.translate(player.x + 32, player.y + 32);
+
+  // flip correctly
+  ctx.scale(player.facing, 1);
+
+  ctx.drawImage(
+    sprite,
+    pos.sx, pos.sy,
+    frameWidth, frameHeight,
+    -32, -32,
+    64, 64
+  );
 
   ctx.restore();
 
-  // blade
+  // blade animation
   if(player.attacking){
     ctx.save();
-    ctx.translate(player.x+32,player.y+32);
+    ctx.translate(player.x+32, player.y+32);
 
-    let angle=(10-player.attackTimer)*0.3*player.facing;
+    let angle = (10 - player.attackTimer) * 0.4 * player.facing;
     ctx.rotate(angle);
 
     ctx.fillStyle="white";
-    ctx.fillRect(0,-5,50,10);
+    ctx.fillRect(0,-4,55,8);
 
     ctx.restore();
   }
