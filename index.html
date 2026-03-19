@@ -1,18 +1,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Titan Survival High-End</title>
+  <title>Titan Survival</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap'); /* Placeholder for DItTy font */
-    body{margin:0;overflow:hidden;background:#1e1e2f;font-family:'Press Start 2P',monospace;}
-    canvas{display:block;background:#87CEEB;}
-    #ui{position:absolute;top:0;left:0;color:white;font-size:20px;padding:10px;}
-    button{font-family:'Press Start 2P',monospace;font-size:14px;padding:5px;margin:5px;}
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #1e1e2f;
+      font-family: 'Press Start 2P', monospace;
+    }
+
+    canvas {
+      display: block;
+      background: linear-gradient(#87CEEB, #cce7ff);
+    }
   </style>
 </head>
 <body>
+
 <canvas id="game"></canvas>
-<div id="ui"></div>
 
 <script>
 const canvas = document.getElementById("game");
@@ -20,274 +28,276 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let ui = document.getElementById("ui");
-
-// ----- Game States -----
+// ---------------- STATE ----------------
 let gameState = "loading"; // loading, menu, playing, gameover
 
-// ----- Assets -----
-let assets = {
-  playerSprite:null,
-  titanSprite:null
-};
-let loadedAssets = 0;
-let totalAssets = 2;
+// ---------------- LOADING ----------------
+let loadingTimer = 0;
 
-// Load placeholder images
-function loadAssets(){
-  assets.playerSprite = new Image();
-  assets.playerSprite.src = "https://via.placeholder.com/40x40.png?text=P";
-  assets.playerSprite.onload = ()=>{loadedAssets++;};
-  
-  assets.titanSprite = new Image();
-  assets.titanSprite.src = "https://via.placeholder.com/60x100.png?text=T";
-  assets.titanSprite.onload = ()=>{loadedAssets++;};
-}
+function drawLoading(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-// ----- Player -----
-class Player {
-  constructor(x,y){
-    this.x=x;
-    this.y=y;
-    this.width=40;
-    this.height=40;
-    this.speed=5;
-    this.health=3;
-    this.coins=0;
-  }
-  move(keys){
-    if(keys["w"]) this.y-=this.speed;
-    if(keys["s"]) this.y+=this.speed;
-    if(keys["a"]) this.x-=this.speed;
-    if(keys["d"]) this.x+=this.speed;
-    // stay inside canvas
-    this.x = Math.max(0,Math.min(canvas.width-this.width,this.x));
-    this.y = Math.max(0,Math.min(canvas.height-this.height,this.y));
-  }
-  draw(){
-    if(assets.playerSprite) ctx.drawImage(assets.playerSprite,this.x,this.y,this.width,this.height);
+  ctx.fillStyle = "white";
+  ctx.textAlign = "center";
+  ctx.font = "50px 'Press Start 2P'";
+  ctx.fillText("LOADING...", canvas.width/2, canvas.height/2 - 40);
+
+  // Progress bar
+  let progress = loadingTimer / 120;
+  ctx.fillStyle = "gray";
+  ctx.fillRect(canvas.width/2 - 150, canvas.height/2, 300, 20);
+
+  ctx.fillStyle = "lime";
+  ctx.fillRect(canvas.width/2 - 150, canvas.height/2, 300 * progress, 20);
+
+  loadingTimer++;
+  if(loadingTimer > 120){
+    gameState = "menu";
   }
 }
 
-// ----- Titan -----
-class Titan {
-  constructor(x,y,speed,health){
-    this.x=x;
-    this.y=y;
-    this.width=60;
-    this.height=100;
-    this.speed=speed;
-    this.health=health;
-  }
-  moveTowards(player){
-    let dx=player.x-this.x;
-    let dy=player.y-this.y;
-    let dist=Math.sqrt(dx*dx+dy*dy);
-    this.x+=(dx/dist)*this.speed;
-    this.y+=(dy/dist)*this.speed;
-  }
-  draw(){
-    if(assets.titanSprite) ctx.drawImage(assets.titanSprite,this.x,this.y,this.width,this.height);
-    // weak spot
-    ctx.fillStyle="yellow";
-    ctx.fillRect(this.x+this.width/2-5,this.y+20,10,10);
-  }
+// ---------------- MENU ----------------
+let selectedCharacter = 0;
+let characters = ["Scout A","Scout B","Scout C","Scout D"];
+
+function drawMenu(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle = "white";
+  ctx.textAlign = "center";
+  ctx.font = "40px 'Press Start 2P'";
+  ctx.fillText("SELECT CHARACTER", canvas.width/2, 100);
+
+  let startX = canvas.width/2 - (characters.length * 140)/2;
+
+  characters.forEach((char,i)=>{
+    let x = startX + i * 140;
+    let y = canvas.height/2;
+
+    ctx.fillStyle = i === selectedCharacter ? "yellow" : "white";
+    ctx.fillRect(x-50, y-50, 100, 100);
+
+    ctx.fillStyle = "black";
+    ctx.font = "12px 'Press Start 2P'";
+    ctx.fillText(char, x, y+80);
+  });
+
+  ctx.fillStyle = "white";
+  ctx.font = "15px 'Press Start 2P'";
+  ctx.fillText("ARROWS TO SELECT • ENTER TO START", canvas.width/2, canvas.height - 80);
 }
 
-// ----- Controls -----
-let keys = {};
-document.addEventListener("keydown", e=> keys[e.key]=true);
-document.addEventListener("keyup", e=> keys[e.key]=false);
+// ---------------- PLAYER ----------------
+let player;
+function createPlayer(){
+  return {
+    x: canvas.width/2,
+    y: canvas.height/2,
+    width: 30,
+    height: 30,
+    speed: 5,
+    health: 3,
+    coins: 0
+  };
+}
 
-// ----- Character Selection -----
-let selectedCharacter=0;
-let characters=["Char1","Char2","Char3","Char4"];
-
-// ----- Game Variables -----
-let player = new Player(canvas.width/2,canvas.height/2);
+// ---------------- TITANS ----------------
 let titans = [];
-let waveNumber=1;
-let attacking=false;
-let attackTimer=0;
+let wave = 1;
 
-// ----- Spawn Titans -----
-function spawnWave(wave){
+function spawnWave(){
   for(let i=0;i<wave+3;i++){
-    titans.push(new Titan(Math.random()*canvas.width,Math.random()*canvas.height,1+Math.random(),2));
+    titans.push({
+      x: Math.random()*canvas.width,
+      y: Math.random()*canvas.height,
+      width: 60,
+      height: 100,
+      speed: 1 + Math.random(),
+      health: 2
+    });
   }
 }
 
-// ----- Collision -----
+// ---------------- CONTROLS ----------------
+let keys = {};
+document.addEventListener("keydown", e=>{
+  keys[e.key] = true;
+
+  if(gameState === "menu"){
+    if(e.key === "ArrowLeft") selectedCharacter = (selectedCharacter - 1 + characters.length) % characters.length;
+    if(e.key === "ArrowRight") selectedCharacter = (selectedCharacter + 1) % characters.length;
+    if(e.key === "Enter") startGame();
+  }
+
+  if(gameState === "gameover" && e.key === "Enter"){
+    startGame();
+  }
+
+  if(gameState === "playing" && e.key === " "){
+    attacking = true;
+    attackTimer = 10;
+  }
+});
+
+document.addEventListener("keyup", e=> keys[e.key] = false);
+
+// ---------------- COLLISION ----------------
 function rectCollision(a,b){
-  return a.x<a.x+b.width && a.x+a.width>b.x && a.y<b.y+b.height && a.y+a.height>b.y;
+  return (
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y
+  );
 }
 
 function circleCollision(x1,y1,r1,x2,y2,r2){
-  let dx=x1-x2, dy=y1-y2;
-  return Math.sqrt(dx*dx + dy*dy)<r1+r2;
+  let dx = x1 - x2;
+  let dy = y1 - y2;
+  return Math.sqrt(dx*dx + dy*dy) < r1 + r2;
 }
 
-// ----- Loading Screen -----
-let loadingTimer=0;
-function drawLoading(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle="white";
-  ctx.font="50px 'Press Start 2P'";
-  ctx.textAlign="center";
-  ctx.fillText("LOADING...",canvas.width/2,canvas.height/2-20);
-  ctx.fillStyle="white";
-  ctx.fillRect(canvas.width/2-150,canvas.height/2+20,300*(loadedAssets/totalAssets),20);
-  
-  if(loadedAssets>=totalAssets){
-    loadingTimer++;
-    if(loadingTimer>30) gameState="menu";
-  }
-}
+// ---------------- ATTACK ----------------
+let attacking = false;
+let attackTimer = 0;
 
-// ----- Character Menu -----
-function drawMenu(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle="white";
-  ctx.font="40px 'Press Start 2P'";
-  ctx.textAlign="center";
-  ctx.fillText("SELECT CHARACTER",canvas.width/2,100);
+function handleAttack(){
+  titans.forEach((t,i)=>{
+    let neckX = t.x + t.width/2;
+    let neckY = t.y + 20;
 
-  const startX=canvas.width/2 - (characters.length*120)/2;
-  const y=canvas.height/2;
-  characters.forEach((char,i)=>{
-    const x=startX+i*120;
-    ctx.fillStyle=i===selectedCharacter?"yellow":"white";
-    ctx.fillRect(x-50,y-50,100,100);
-    ctx.fillStyle="black";
-    ctx.fillText(char,x,y+80);
+    if(circleCollision(
+      player.x + player.width/2,
+      player.y + player.height/2,
+      40,
+      neckX,
+      neckY,
+      15
+    )){
+      t.health--;
+
+      if(t.health <= 0){
+        titans.splice(i,1);
+        player.coins++;
+      }
+    }
   });
-  ctx.font="20px 'Press Start 2P'";
-  ctx.fillStyle="white";
-  ctx.fillText("Use LEFT/RIGHT arrows & ENTER to start",canvas.width/2,canvas.height-100);
 }
 
-// Menu controls
-document.addEventListener("keydown", e=>{
-  if(gameState==="menu"){
-    if(e.key==="ArrowLeft") selectedCharacter=(selectedCharacter-1+characters.length)%characters.length;
-    if(e.key==="ArrowRight") selectedCharacter=(selectedCharacter+1)%characters.length;
-    if(e.key==="Enter") startGame();
-  }
-});
-
-// ----- Start Game -----
-function startGame(){
-  gameState="playing";
-  player = new Player(canvas.width/2,canvas.height/2);
-  titans=[];
-  waveNumber=1;
-  player.health=3;
-  player.coins=0;
-  spawnWave(waveNumber);
-}
-
-// ----- Attack -----
-document.addEventListener("keydown", e=>{
-  if(gameState==="playing" && e.key===" "){
-    attacking=true;
-    attackTimer=10;
-  }
-});
-
-// ----- Update -----
+// ---------------- UPDATE ----------------
 function update(){
-  player.move(keys);
+  // Movement
+  if(keys["w"]) player.y -= player.speed;
+  if(keys["s"]) player.y += player.speed;
+  if(keys["a"]) player.x -= player.speed;
+  if(keys["d"]) player.x += player.speed;
 
-  // Titans move
+  // Titans
   titans.forEach(t=>{
-    t.moveTowards(player);
-    // collision with player
+    let dx = player.x - t.x;
+    let dy = player.y - t.y;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+
+    t.x += (dx/dist)*t.speed;
+    t.y += (dy/dist)*t.speed;
+
     if(rectCollision(player,t)){
       player.health--;
-      t.x=Math.random()*canvas.width;
-      t.y=Math.random()*canvas.height;
-      if(player.health<=0) gameState="gameover";
+      t.x = Math.random()*canvas.width;
+      t.y = Math.random()*canvas.height;
+
+      if(player.health <= 0){
+        gameState = "gameover";
+      }
     }
   });
 
   if(attacking){
     attackTimer--;
-    if(attackTimer<=0) attacking=false;
+    handleAttack();
+    if(attackTimer <= 0) attacking = false;
   }
 
-  // Attack Titans
-  titans.forEach(t=>{
-    const neckX=t.x+t.width/2;
-    const neckY=t.y+20;
-    if(attacking && circleCollision(player.x+player.width/2,player.y+player.height/2,40,neckX,neckY,15)){
-      t.health--;
-      if(t.health<=0){
-        titans.splice(titans.indexOf(t),1);
-        player.coins++;
-      }
-    }
-  });
-
-  // Wave complete
-  if(titans.length===0){
-    waveNumber++;
-    spawnWave(waveNumber);
+  if(titans.length === 0){
+    wave++;
+    spawnWave();
   }
 }
 
-// ----- Draw -----
+// ---------------- DRAW ----------------
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  player.draw();
-  titans.forEach(t=>t.draw());
 
-  // Attack effect
+  // Player
+  ctx.fillStyle = "black";
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+
+  // Titans
+  titans.forEach(t=>{
+    ctx.fillStyle = "red";
+    ctx.fillRect(t.x, t.y, t.width, t.height);
+
+    // weak spot
+    ctx.fillStyle = "yellow";
+    ctx.fillRect(t.x + t.width/2 - 5, t.y + 20, 10, 10);
+  });
+
+  // Slash effect
   if(attacking){
-    ctx.strokeStyle="white";
+    ctx.strokeStyle = "white";
     ctx.beginPath();
-    ctx.arc(player.x+player.width/2,player.y+player.height/2,40,0,Math.PI*2);
+    ctx.arc(player.x + player.width/2, player.y + player.height/2, 40, 0, Math.PI*2);
     ctx.stroke();
   }
 
   // HUD
-  ctx.fillStyle="green";
+  ctx.fillStyle = "green";
   for(let i=0;i<player.health;i++){
-    ctx.fillRect(20+i*25,20,20,20);
+    ctx.fillRect(20 + i*25, 20, 20, 20);
   }
-  ctx.fillStyle="gold";
-  ctx.fillText("Coins: "+player.coins,20,70);
-  ctx.fillStyle="white";
-  ctx.fillText("Wave: "+waveNumber,20,100);
+
+  ctx.fillStyle = "gold";
+  ctx.fillText("Coins: " + player.coins, 20, 70);
+
+  ctx.fillStyle = "white";
+  ctx.fillText("Wave: " + wave, 20, 100);
 }
 
-// ----- Game Over -----
+// ---------------- GAME OVER ----------------
 function drawGameOver(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle="red";
-  ctx.font="60px 'Press Start 2P'";
-  ctx.textAlign="center";
-  ctx.fillText("GAME OVER",canvas.width/2,canvas.height/2-50);
-  ctx.font="30px 'Press Start 2P'";
-  ctx.fillText("Coins Collected: "+player.coins,canvas.width/2,canvas.height/2+20);
-  ctx.fillText("Press ENTER to Restart",canvas.width/2,canvas.height/2+70);
+
+  ctx.fillStyle = "red";
+  ctx.font = "50px 'Press Start 2P'";
+  ctx.textAlign = "center";
+  ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2 - 40);
+
+  ctx.font = "20px 'Press Start 2P'";
+  ctx.fillText("Coins: " + player.coins, canvas.width/2, canvas.height/2 + 20);
+  ctx.fillText("Press ENTER to restart", canvas.width/2, canvas.height/2 + 60);
 }
 
-// Restart
-document.addEventListener("keydown", e=>{
-  if(gameState==="gameover" && e.key==="Enter") startGame();
-});
+// ---------------- START ----------------
+function startGame(){
+  player = createPlayer();
+  titans = [];
+  wave = 1;
+  spawnWave();
+  gameState = "playing";
+}
 
-// ----- Main Loop -----
+// ---------------- LOOP ----------------
 function gameLoop(){
-  if(gameState==="loading") drawLoading();
-  else if(gameState==="menu") drawMenu();
-  else if(gameState==="playing"){update();draw();}
-  else if(gameState==="gameover") drawGameOver();
+  if(gameState === "loading") drawLoading();
+  else if(gameState === "menu") drawMenu();
+  else if(gameState === "playing"){ update(); draw(); }
+  else if(gameState === "gameover") drawGameOver();
+
   requestAnimationFrame(gameLoop);
 }
 
-loadAssets();
 gameLoop();
 </script>
+
 </body>
 </html>
